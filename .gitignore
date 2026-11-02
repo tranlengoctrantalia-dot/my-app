@@ -7,3 +7,6 @@ build/
 Thumbs.db
 .vscode/
 *.log
+
+# Tài liệu đầu vào (file Excel chi tiêu thật) — chỉ để trên máy
+project/my_personal_finance_app/docs/

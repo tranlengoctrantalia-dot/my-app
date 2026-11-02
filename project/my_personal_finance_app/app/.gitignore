@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+
+# Khoá / cấu hình riêng: chỉ để trên máy
+.env
+.env.*
+!.env.example
+
+# Dữ liệu chi tiêu thật (lấy từ file Excel) — không đưa lên mạng
+src/data/seed.ts
+
+# Test dùng số liệu thật từ file Excel (cần seed.ts) — chỉ để trên máy
+src/domain/calc.test.ts
+src/domain/report.test.ts
+src/ai/local.test.ts
+src/exportExcel.test.ts

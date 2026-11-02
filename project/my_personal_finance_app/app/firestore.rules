@@ -1,0 +1,28 @@
+rules_version = '2';
+// Luật bảo mật cho sổ chung — dán vào Firebase Console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMember(ledger) { return signedIn() && request.auth.uid in ledger.members; }
+
+    match /ledgers/{ledgerId} {
+      // Chỉ thành viên mới xem được sổ.
+      allow read: if isMember(resource.data);
+      allow create: if signedIn()
+        && request.resource.data.members == [request.auth.uid]
+        && request.resource.data.createdBy == request.auth.uid;
+      // Thành viên sửa được tên, rời sổ...; người cầm link mời (mã sổ) chỉ được tự thêm chính mình.
+      allow update: if (isMember(resource.data) && request.resource.data.createdBy == resource.data.createdBy)
+        || (signedIn()
+          && !(request.auth.uid in resource.data.members)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'people'])
+          && request.resource.data.members.toSet() == resource.data.members.toSet().union([request.auth.uid].toSet())
+          && request.resource.data.people.diff(resource.data.people).affectedKeys().hasOnly([request.auth.uid]));
+      allow delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+
+      match /entries/{entryId} {
+        allow read, write: if isMember(get(/databases/$(database)/documents/ledgers/$(ledgerId)).data);
+      }
+    }
+  }
+}

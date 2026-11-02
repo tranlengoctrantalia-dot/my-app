@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#212121" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <title>Ví Gọn</title>
+    <script>
+      // Chống màn trắng. Chạy trước cả app, nên vẫn hoạt động khi file app tải hỏng.
+      // ?fix: xoá bộ nhớ đệm + service worker (GIỮ NGUYÊN dữ liệu), rồi mở lại app.
+      (function () {
+        function fix() {
+          var jobs = [];
+          if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+          if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+          Promise.all(jobs).catch(function () {}).then(function () { location.replace('/'); });
+        }
+        window.__vgFix = fix;
+        if (/[?&]fix\b/.test(location.search)) { fix(); return; }
+        var lastError = '';
+        window.addEventListener('error', function (e) { lastError = (e && (e.message || (e.target && e.target.src))) || lastError; }, true);
+        window.addEventListener('unhandledrejection', function (e) { lastError = String(e && e.reason) || lastError; });
+        // Sau 8 giây mà app vẫn chưa hiện gì → hiện nút sửa thay cho màn trắng.
+        setTimeout(function () {
+          var root = document.getElementById('root');
+          if (window.__vgBooted || !root || root.childElementCount) return;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;background:#212121;color:#fff;font-family:system-ui,sans-serif;text-align:center">' +
+            '<img src="/icon.svg" width="56" height="56" alt="">' +
+            '<b style="font-size:18px">Ví Gọn chưa mở được</b>' +
+            '<span style="color:#a8a9b1;font-size:14px;max-width:320px">Thường do còn giữ bản cũ. Bấm <b>Sửa lỗi</b>: app xoá bản cũ và mở lại, <b>dữ liệu vẫn giữ nguyên</b>.</span>' +
+            '<button onclick="__vgFix()" style="padding:12px 28px;border:0;border-radius:99px;background:#be3a5a;color:#fff;font-size:16px">Sửa lỗi</button>' +
+            '<button onclick="location.reload()" style="padding:10px 24px;border:1px solid #3d3d3d;border-radius:99px;background:none;color:#fff;font-size:15px">Tải lại</button>' +
+            '<small id="vg-err" style="color:#6b6b72;font-size:11px;max-width:320px;word-break:break-all"></small></div>';
+          document.getElementById('vg-err').textContent = lastError;
+        }, 8000);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

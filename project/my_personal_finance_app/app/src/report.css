@@ -1,0 +1,250 @@
+/* ---------- Màn Báo cáo ---------- */
+.rpt {
+  min-width: 0;
+}
+.rpt .card {
+  min-width: 0;
+}
+.rpt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.rpt-head .card-title {
+  margin: 0;
+}
+.rpt-big {
+  display: grid;
+  gap: 2px;
+}
+.rpt-big small,
+.rpt-split small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.rpt-big b {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.rpt-big > span {
+  font-size: 13px;
+  font-weight: 600;
+}
+.rpt-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.rpt-split > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.rpt-split b {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.rpt-split .hint {
+  font-size: 12px;
+}
+
+/* Số liệu của cột đang chọn */
+.rpt-readout {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 8px 0 12px;
+  font-size: 14px;
+}
+.rpt-readout__nums {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-weight: 600;
+}
+.rpt-readout__nums > span,
+.rpt-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rpt-key {
+  display: inline-block;
+  flex-shrink: 0;
+}
+.rpt-key--spent {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+.rpt-key--income {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--pos);
+}
+.rpt-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+/* Biểu đồ cột */
+.rpt-chart {
+  position: relative;
+  padding-bottom: 24px;
+}
+.rpt-chart svg,
+.rpt-mini svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.rpt-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.rpt-bar {
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.rpt-bar.is-sel {
+  opacity: 1;
+}
+.rpt-bar.is-partial {
+  fill-opacity: 0.55;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.rpt-income {
+  stroke: var(--pos);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.rpt-avg {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.rpt-cols {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+.rpt-cols button {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  position: relative;
+  min-width: 0;
+  padding: 0 0 4px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rpt-cols button span {
+  line-height: 20px;
+}
+.rpt-cols button[aria-pressed='true'] {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+.rpt-cols button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+/* Chấm nhỏ dưới tháng đang chạy dở */
+.rpt-cols button i {
+  position: absolute;
+  bottom: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* Điểm đáng chú ý */
+.rpt-notes {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.rpt-note {
+  position: relative;
+  padding-left: 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.rpt-note::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.rpt-note--up::before {
+  background: var(--neg);
+}
+.rpt-note--down::before {
+  background: var(--pos);
+}
+.rpt-note--top::before {
+  background: var(--accent);
+}
+
+/* Theo danh mục */
+.rpt-chips {
+  margin: 10px 0 14px;
+}
+.rpt-mini {
+  min-width: 0;
+}
+.rpt-labels {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  margin-top: 6px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.rpt-avg-text {
+  margin: 8px 0 0;
+}
+
+/* Chưa có dữ liệu */
+.rpt-empty {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  text-align: center;
+  padding: 32px 18px;
+}
+.rpt-empty p {
+  margin: 0;
+}
