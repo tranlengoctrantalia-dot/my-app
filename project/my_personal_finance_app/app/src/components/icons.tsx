@@ -7,7 +7,7 @@ import { useStore } from '../store';
 const files = import.meta.glob(
   [
     '/node_modules/@material-symbols/svg-400/rounded/{home,receipt_long,pie_chart,credit_card,settings,shopping_bag,local_cafe,favorite,two_wheeler,redeem,spa,sell,groups,fitness_center,savings,volunteer_activism,mobile,calendar_today,person,cloud,payments,light_mode,dark_mode,bolt,medication,movie,school,pets,celebration,work,restaurant,checkroom,face,flight,directions_car,sports_esports,child_care,photo_camera,mail,edit,delete,add_circle,account_balance,account_balance_wallet,fastfood,local_mall,home_repair_service,wifi,local_gas_station,trending_up,document_scanner,shopping_cart,grocery,star,palette,help,mic,group_add,link,logout,swap_horiz,handshake,lock,fingerprint,notifications,flag,upload_file,call_made,call_received,backspace,beach_access,devices,flight_takeoff,laptop_mac,diamond,emergency,visibility,visibility_off,calendar_month,fact_check,warning}-fill.svg',
-    '/node_modules/@material-symbols/svg-400/rounded/{add,chevron_left,chevron_right,search,close,undo,check,content_copy}.svg',
+    '/node_modules/@material-symbols/svg-400/rounded/{add,chevron_left,chevron_right,search,close,undo,check,content_copy,info}.svg',
   ],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;
@@ -61,6 +61,17 @@ export function Icon({ name, size = 22, ...rest }: { name: IconName; size?: numb
       ))}
     </svg>
   );
+}
+
+/** Icon 3D (Fluent Emoji, MIT) trong public/emoji; tên trùng với tên icon ở trên. */
+const art3d = new Set(
+  'bag bank bike bolt bullseye calendar calendar_month card care cash celebration check checkroom child_care cloud coffee directions_car dumbbell ewallet face fact_check fastfood flag flight gift grocery handshake heart help home_repair_service local_gas_station lock medication money movie notepad notifications palette pets phone receipt restaurant scan school shopping_cart sparkle sports_esports star tag target trending_up user users wallet warning wifi work'.split(' '),
+);
+
+/** Icon nhiều màu; tên chưa có bản 3D thì dùng icon thường. */
+export function Art({ name, size = 28 }: { name: IconName; size?: number }) {
+  if (!art3d.has(name)) return <Icon name={name} size={size} />;
+  return <img className="art" src={`/emoji/${name}.webp`} width={size} height={size} alt="" loading="lazy" />;
 }
 
 /** Các icon cho người dùng chọn khi tạo danh mục. */
@@ -134,7 +145,7 @@ export function CatBadge({ id, size = 40 }: { id: string; size?: number }) {
   const color = catColor(id, c);
   return (
     <span className="cat-badge" style={{ width: size, height: size, color, background: `${color}26` }}>
-      <Icon name={catIcon(id, c)} size={Math.round(size * 0.55)} />
+      <Art name={catIcon(id, c)} size={Math.round(size * 0.68)} />
     </span>
   );
 }

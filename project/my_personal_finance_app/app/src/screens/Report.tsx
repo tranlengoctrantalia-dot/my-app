@@ -7,7 +7,7 @@ import type { PeriodKey } from '../domain/types';
 import { useStore } from '../store';
 import { chartColor } from '../components/Donut';
 import { RecapSheet } from '../components/Recap';
-import { Icon } from '../components/icons';
+import { Art, Icon } from '../components/icons';
 import { t, Rich } from '../i18n';
 import { L } from '../labels';
 
@@ -110,6 +110,7 @@ export function Report() {
     return (
       <div className="stack">
         <section className="card rpt-empty">
+          <Art name="target" size={96} />
           <b>{R.emptyTitle}</b>
           <p className="hint">{R.emptyText}</p>
         </section>
@@ -167,11 +168,14 @@ export function Report() {
             <small>{R.income}</small>
             <b className="pos">{money(now.income)}</b>
           </div>
-          <div>
-            <small>{now.saving >= 0 ? R.saving : R.overspent}</small>
-            <b className={now.saving < 0 ? 'neg' : ''}>{money(Math.abs(now.saving))}</b>
-            {rate != null && rate > 0 && <span className="hint">{t(R.savingRate, { pct: rate })}</span>}
-          </div>
+          {/* Chưa nhận lương thì "chi quá thu" chỉ là báo động giả. */}
+          {now.income > 0 && (
+            <div>
+              <small>{now.saving >= 0 ? R.saving : R.overspent}</small>
+              <b className={now.saving < 0 ? 'neg' : ''}>{money(Math.abs(now.saving))}</b>
+              {rate != null && rate > 0 && <span className="hint">{t(R.savingRate, { pct: rate })}</span>}
+            </div>
+          )}
         </div>
       </section>
 

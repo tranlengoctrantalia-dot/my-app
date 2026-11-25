@@ -5,16 +5,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   budgetReport,
-  cashCheck,
   incomeIn,
   netWorth,
-  nextDuePeriod,
   payables,
-  periodInfo,
   monthOf,
+  monthRange,
   receivables,
   shiftPeriod,
-  statement,
   todayISO,
   txInPeriod,
 } from '../domain/calc';
@@ -29,7 +26,9 @@ import type { Transaction } from '../domain/types';
 import { useLookups, useStore } from '../store';
 import { WalletSheet } from '../components/Wallets';
 import { Sheet } from '../components/ui';
-import { CatBadge, Icon, type IconName } from '../components/icons';
+import { PayPlanSheet } from '../components/PayPlan';
+import { buildPlan, check } from '../domain/advice';
+import { Art, CatBadge, Icon, type IconName } from '../components/icons';
 import type { Tab } from '../App';
 import { DriveBanner } from '../sync/DriveCard';
 import { TxRow } from './Transactions';
@@ -98,9 +97,12 @@ function Tile({
   value,
   sub,
   tone,
+  wide,
   onClick,
   children,
 }: {
+  /** Ô quan trọng nhất: chiếm cả hàng. */
+  wide?: boolean;
   icon: IconName;
   label: string;
   value: string;
@@ -110,10 +112,10 @@ function Tile({
   children?: ReactNode;
 }) {
   return (
-    <button className="tile" onClick={onClick}>
+    <button className={`tile${wide ? ' tile--wide' : ''}`} onClick={onClick}>
       <span className="tile__head">
         <span className="tile__icon">
-          <Icon name={icon} size={18} />
+          <Art name={icon} size={24} />
         </span>
         {label}
       </span>
@@ -177,7 +179,6 @@ function CustomizeSheet({ hidden, toggle, onClose }: { hidden: Set<Block>; toggl
   return (
     <Sheet title={H.customizeTitle} onClose={onClose}>
       <div className="form">
-        <p className="hint">{H.customizeHint}</p>
         {BLOCKS.map((b) => (
           <label key={b} className="switch-row">
             <span>{H.blocks[b]}</span>
@@ -216,6 +217,8 @@ export function Overview({
   const [hidden, toggleBlock] = useHiddenBlocks();
   const show = (b: Block) => !hidden.has(b);
   const [customizing, setCustomizing] = useState(false);
+  // Bấm ô Trả thẻ: bảng "Đủ tiền không?" tính cả các thẻ.
+  const [enoughOpen, setEnoughOpen] = useState(false);
   const [oddSeen, dismissOdd] = useSeen('vi-cua-nang/odd-seen');
   const [recapSeen, markRecap] = useSeen('vi-cua-nang/recap-seen');
   const today = todayISO();
@@ -229,13 +232,16 @@ export function Overview({
   const left = limit - spent;
   const earned = incomeIn(data, period);
   const hero = useCountUp(limit > 0 ? Math.abs(left) : spent);
+  // Số ngày còn lại trong tháng, tính cả hôm nay.
+  const daysInMonthLeft = daysBetween(today, monthRange(period).end) + 1;
 
   const hasCard = data.accounts.some((a) => a.kind === 'credit');
-  const duePeriod = nextDuePeriod(today, s);
-  const due = periodInfo(duePeriod, s);
-  const st = statement(data, duePeriod);
-  const check = cashCheck(data, duePeriod);
-  const daysLeft = daysBetween(today, due.due);
+  // Khả năng thanh toán tháng này nếu không tiêu thêm.
+  const payPlan = buildPlan(data, today);
+  // Theo ngân sách: chi linh hoạt mỗi ngày đúng như đã đặt.
+  const payCheck = check(payPlan, payPlan.flexPerDay);
+  // Người cần đòi sớm nhất (tiền người khác trả lại trong tháng này).
+  const nextOwed = payPlan.incoming.filter((i) => i.date <= payPlan.monthEnd).sort((a, b) => a.date.localeCompare(b.date))[0];
 
   const rec = receivables(data);
   const owe = payables(data);
@@ -309,36 +315,43 @@ export function Overview({
             </span>
           </span>
           {limit === 0 && <span className="hero2__hint">{H.heroHint}</span>}
+          {/* "Còn 4tr" đầu tháng không phải dư: chia ra mỗi ngày cho rõ. */}
+          {limit > 0 && left > 0 && daysInMonthLeft > 0 && (
+            <span className="hero2__hint">{tr(H.heroPerDay, { amount: money(Math.floor(left / daysInMonthLeft / 1000) * 1000), n: daysInMonthLeft })}</span>
+          )}
         </span>
         {limit > 0 && <Ring pct={spent / limit} />}
       </button>
 
       {/* Lưới ô nhỏ 2 cột (bật / tắt được từng ô) */}
       <div className="tiles">
+        {hasCard && show('card') && (
+          <Tile
+            wide
+            icon="card"
+            label={L.plan.tile}
+            value={payCheck.left < 0 ? tr(L.plan.tileShort, { amount: money(-payCheck.left) }) : L.plan.tileOk}
+            tone={payCheck.left < 0 ? 'neg' : 'pos'}
+            sub={
+              payCheck.left < 0
+                ? payCheck.savings > 0
+                  ? tr(L.plan.tileSubShort, {
+                      result: payCheck.leftNoSaving >= 0 ? tr(L.plan.tileSurplus, { amount: money(payCheck.leftNoSaving) }) : tr(L.plan.tileStill, { amount: money(-payCheck.leftNoSaving) }),
+                    })
+                  : undefined
+                : tr(L.plan.tileSubOk, { amount: money(payCheck.maxPerDay) })
+            }
+            onClick={() => setEnoughOpen(true)}
+          />
+        )}
         {show('wealth') && (
           <Tile
             icon="wallet"
             label={H.tileWealth}
-            value={nw.rows.length ? money(nw.total) : H.tileWealthEmpty}
-            sub={nw.rows.length ? tr(H.tileWealthSub, { n: nw.rows.length }) : H.tileWealthHint}
+            value={nw.rows.length ? money(nw.total) : s.cashOnHand ? money(s.cashOnHand) : H.tileWealthEmpty}
+            sub={nw.rows.length ? tr(H.tileWealthSub, { n: nw.rows.length }) : s.cashOnHand ? H.tileWealthCash : H.tileWealthHint}
             tone={nw.total < 0 ? 'neg' : undefined}
             onClick={() => setWallet(true)}
-          />
-        )}
-        {hasCard && show('card') && (
-          <Tile
-            icon="card"
-            label={tr(H.cardDue, { date: dm(due.due) })}
-            value={money(st.total)}
-            sub={
-              <>
-                {daysLeft >= 0 ? tr(H.cardDaysLeft, { n: daysLeft }) : H.cardOverdue} ·{' '}
-                <span className={check.surplus >= 0 ? 'pos' : 'neg'}>
-                  {check.surplus >= 0 ? tr(H.cardSurplus, { amount: money(check.surplus) }) : tr(H.cardShort, { amount: money(-check.surplus) })}
-                </span>
-              </>
-            }
-            onClick={() => go('card')}
           />
         )}
         {rec.total > 0 && show('owed') && (
@@ -346,7 +359,13 @@ export function Overview({
             icon="heart"
             label={rec.byPerson.length === 1 ? tr(H.partnerOwes, { name: personName(s, rec.byPerson[0].id) }) : H.manyOwe}
             value={money(rec.total)}
-            sub={rec.byPerson.length === 1 ? tr(H.owedCount, { n: rec.open.length }) : tr(H.manyOweSub, { n: rec.byPerson.length, k: rec.open.length })}
+            sub={
+              nextOwed
+                ? tr(nextOwed.late ? L.coach.owedLate : L.coach.owedSoon, { date: dm(nextOwed.date) })
+                : rec.byPerson.length === 1
+                  ? tr(H.owedCount, { n: rec.open.length })
+                  : tr(H.manyOweSub, { n: rec.byPerson.length, k: rec.open.length })
+            }
             onClick={() => go('split')}
           />
         )}
@@ -388,7 +407,7 @@ export function Overview({
             onClick={() => go('calendar')}
           />
         )}
-        {hasLast && show('recap') && <Tile icon="celebration" label={L.recap.button} value={periodLabel(lastPeriod)} sub={H.recapSub} onClick={openRecap} />}
+        {hasLast && !showRecapBanner && show('recap') && <Tile icon="celebration" label={L.recap.button} value={periodLabel(lastPeriod)} sub={H.recapSub} onClick={openRecap} />}
         {show('trend') && (
           <Tile icon="target" label={H.tileTrend} value={money(spark[spark.length - 1] ?? 0)} sub={H.reportLink} onClick={() => go('report')}>
             <Sparkline values={spark} />
@@ -443,6 +462,7 @@ export function Overview({
         </section>
       )}
 
+      {enoughOpen && <PayPlanSheet onClose={() => setEnoughOpen(false)} onCards={() => go('card')} />}
       {customizing && <CustomizeSheet hidden={hidden} toggle={toggleBlock} onClose={() => setCustomizing(false)} />}
       {recapOpen && <RecapSheet period={lastPeriod} onClose={() => setRecapOpen(false)} />}
       {wallet && (

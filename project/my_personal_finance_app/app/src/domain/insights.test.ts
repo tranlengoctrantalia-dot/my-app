@@ -49,6 +49,29 @@ describe('đối chiếu sao kê', () => {
   });
 });
 
+describe('đối chiếu theo kỳ chốt', () => {
+  it('khoản ngoài kỳ (kỳ trước đã trả, kỳ sau) không bị báo thừa; ghi lệch ngày qua chốt vẫn khớp', () => {
+    const d = base([
+      tx({ date: '2026-10-06', amount: 50_000, merchant: 'Kỳ trước' }),
+      tx({ date: '2026-10-09', amount: 120_000, merchant: 'Grab' }),
+      tx({ date: '2026-11-08', amount: 70_000, merchant: 'Lẻ trong kỳ' }),
+      tx({ date: '2026-11-09', amount: 77_760, merchant: 'Kỳ sau' }),
+      tx({ date: '2026-11-10', amount: 300_000, merchant: 'Shopee' }), // ngân hàng ghi 08/11
+    ]);
+    const r = reconcile(
+      d,
+      'card',
+      [
+        { date: '2026-10-09', merchant: 'GRAB', amount: 120_000 },
+        { date: '2026-11-08', merchant: 'SHOPEE', amount: 300_000 },
+      ],
+      { start: '2026-10-09', end: '2026-11-08' },
+    );
+    expect(r.matched).toHaveLength(2);
+    expect(r.extra.map((x) => x.tx.merchant)).toEqual(['Lẻ trong kỳ']);
+  });
+});
+
 describe('khoản lạ', () => {
   it('bắt ghi trùng, gói tháng trừ 2 lần, khoản to bất thường', () => {
     const d = base([

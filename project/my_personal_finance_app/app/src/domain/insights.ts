@@ -2,11 +2,12 @@
  * Các tính năng "thông minh": khoản lạ cần xem lại, gợi ý ngân sách, tổng kết tháng, lịch tiền.
  * Hàm thuần, không dùng React.
  */
-import { monthOf, monthRange, budgetReport, incomeIn, installmentActive, installmentAmount, isSpending, parsePeriod, periodInfo, shiftPeriod, spentByCategory, statement, sum, txInPeriod } from './calc';
+import { cardSettings, monthOf, monthRange, statementPaid, budgetReport, incomeIn, installmentActive, installmentMine, isSpending, parsePeriod, periodInfo, shiftPeriod, spentByCategory, statement, sum, txInPeriod } from './calc';
 import { fold } from '../ai/redact';
+import { budgetRoom } from './coach';
 import { goalStatus } from './goals';
 import { basePeriods, periodTotals, spendCategoryIds } from './report';
-import type { AppData, ISODate, PeriodKey, Transaction } from './types';
+import type { AppData, Installment, ISODate, PeriodKey, Transaction } from './types';
 
 const days = (a: ISODate, b: ISODate) => Math.abs(Date.parse(a) - Date.parse(b)) / 86_400_000;
 const norm = (s: string) => s.trim().toLowerCase();
@@ -31,7 +32,14 @@ export type Odd =
 export const CARD_PAY = /(^|\s)(tra|thanh toan|tt)( du)? (no )?the( tin dung)?(\s|$)|card payment|tra tien the/;
 const LOAN = /(^|\s)cho (\S+ ){0,3}(muon|vay)(\s|$)|(^|\s)(tra no|tra lai tien)(\s|$)/;
 // Chỉ "trả góp" mới tính; "góp quỹ", "góp tiền đi chơi"… không phải trả góp.
-const INSTALLMENT = /(^|\s)tra gop(\s|$)|installment/;
+export const INSTALLMENT = /(^|\s)tra gop(\s|$)|installment/;
+
+/** Khoản sắp ghi có vẻ trùng một khoản trả góp đang chạy (app đã tự cộng vào sao kê và ngân sách). */
+export function installmentMatch(data: AppData, merchant: string, amount: number, date: ISODate): Installment | undefined {
+  const text = fold(merchant);
+  const active = data.installments.filter((i) => installmentActive(i, monthOf(date)));
+  return active.find((i) => i.monthly === amount || (fold(i.name).length > 2 && text.includes(fold(i.name))));
+}
 
 /** Khoản to bất thường: gấp ≥ BIG_TIMES lần mức thường và ≥ BIG_MIN. */
 const BIG_TIMES = 3;
@@ -148,7 +156,7 @@ export function planBudget(data: AppData, period: PeriodKey, income: number, sav
   }
   for (const i of data.installments) {
     if (!installmentActive(i, period)) continue;
-    const v = installmentAmount(i, period);
+    const v = installmentMine(i, period);
     limits[i.categoryId] = (limits[i.categoryId] ?? 0) + v;
     installments += v;
   }
@@ -199,7 +207,7 @@ export function recap(data: AppData, period: PeriodKey): Recap {
   const spendDays = new Set(txs.filter((x) => data.categories.find((c) => c.id === x.categoryId)?.kind === 'spend').map((x) => x.date));
   const rows = budgetReport(data, period).rows.filter((r) => r.limit > 0);
   const goalsSaved = sum(
-    (data.goals ?? []).flatMap((g) => g.deposits.filter((d) => monthOf(d.date) === period).map((d) => d.amount)),
+    (data.goals ?? []).flatMap((g) => g.deposits.filter((d) => !d.opening && monthOf(d.date) === period).map((d) => d.amount)),
   );
   return {
     period,
@@ -237,18 +245,23 @@ export function moneyEvents(data: AppData, month: PeriodKey, labels: { salary: s
   const out: MoneyEvent[] = [];
 
   const salaryTx = data.recurring?.find((r) => r.kind === 'income' && !r.paused);
-  out.push({ date: day(s.salaryDay), kind: 'salary', title: labels.salary, amount: salaryTx?.amount, incoming: true });
+  // Chưa có khoản lương định kỳ thì lấy lương trong Ngân sách.
+  out.push({ date: day(s.salaryDay), kind: 'salary', title: labels.salary, amount: salaryTx?.amount ?? (budgetRoom(data, month).income || undefined), incoming: true });
 
-  if (data.accounts.some((a) => a.kind === 'credit')) {
-    // Kỳ thẻ có hạn trả rơi vào tháng này.
+  // Kỳ thẻ có hạn trả rơi vào tháng này (mỗi thẻ theo ngày riêng).
+  const cards = data.accounts.filter((a) => a.kind === 'credit');
+  for (const a of cards) {
     for (const p of [shiftPeriod(month, -1), month, shiftPeriod(month, 1)]) {
-      const due = periodInfo(p, s).due;
-      if (due.startsWith(month)) out.push({ date: due, kind: 'card', title: labels.card, amount: statement(data, p).total });
+      const due = periodInfo(p, cardSettings(data, a.id)).due;
+      if (due.startsWith(month))
+        out.push({ date: due, kind: 'card', title: cards.length > 1 ? `${labels.card} · ${a.name}` : labels.card, amount: Math.max(0, statement(data, p, a.id).total - statementPaid(data, p, a.id)) });
     }
   }
 
   for (const r of data.recurring ?? []) {
     if (r.paused || (r.kind === 'income' && r === salaryTx)) continue;
+    // Khoản định kỳ quẹt thẻ đã nằm trong số trả thẻ: không tính lần nữa.
+    if (r.kind !== 'income' && data.accounts.find((a) => a.id === r.accountId)?.kind === 'credit') continue;
     const d = day(r.day);
     if (d < r.startDate) continue;
     out.push({ date: d, kind: r.kind === 'income' ? 'income' : 'recurring', title: r.merchant, amount: r.amount, incoming: r.kind === 'income' });
@@ -262,5 +275,6 @@ export function moneyEvents(data: AppData, month: PeriodKey, labels: { salary: s
 /** Mốc sắp tới gần nhất tính từ hôm nay (xem 2 tháng). */
 export function nextEvent(data: AppData, today: ISODate, labels: { salary: string; card: string }): MoneyEvent | undefined {
   const month = today.slice(0, 7);
-  return [...moneyEvents(data, month, labels), ...moneyEvents(data, shiftPeriod(month, 1), labels)].find((e) => e.date >= today);
+  // Hạn thẻ đã trả đủ (còn 0đ) thì bỏ qua, nhắc việc kế tiếp.
+  return [...moneyEvents(data, month, labels), ...moneyEvents(data, shiftPeriod(month, 1), labels)].find((e) => e.date >= today && !(e.kind === 'card' && !e.amount));
 }

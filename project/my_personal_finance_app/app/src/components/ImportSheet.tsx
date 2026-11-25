@@ -10,7 +10,7 @@ import { useLookups, useStore } from '../store';
 import { BANKS, DEFAULT_LIMITS, GmailError, buildQuery, fetchBankEmails, forgetGmailAccount, getGmailAccount } from '../sync/gmail';
 import { CatBadge, Icon } from './icons';
 import { TxForm } from './TxForm';
-import { Sheet } from './ui';
+import { Sheet, Info } from './ui';
 import { L } from '../labels';
 import { splitsOf } from '../domain/split';
 // Đặt tên khác vì trong danh sách bên dưới đã có biến `t` (giao dịch).
@@ -419,7 +419,7 @@ function GmailLimitsPanel() {
               </button>
             ))}
           </div>
-          {custom && <p className="hint">{T.limits.customHint}</p>}
+          {custom && <Info>{T.limits.customHint}</Info>}
         </div>
       )}
     </div>

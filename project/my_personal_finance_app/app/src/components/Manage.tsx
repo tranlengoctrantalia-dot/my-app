@@ -3,8 +3,8 @@ import { isTouch } from '../viewport';
 import { uid } from '../domain/format';
 import type { Account, AccountKind, Category, CategoryKind } from '../domain/types';
 import { useStore } from '../store';
-import { Icon, catColor, catIcon, palette, pickableIcons } from './icons';
-import { Sheet } from './ui';
+import { Art, catColor, catIcon, palette, pickableIcons } from './icons';
+import { NumberInput, Sheet } from './ui';
 import { L } from '../labels';
 import { t } from '../i18n';
 
@@ -14,24 +14,33 @@ export const accountKinds: { id: AccountKind; label: string; icon: string }[] = 
   { id: 'credit', label: T.kindCredit, icon: 'card' },
   { id: 'ewallet', label: T.kindEwallet, icon: 'ewallet' },
   { id: 'bank', label: T.kindBank, icon: 'bank' },
-  { id: 'cash', label: T.kindCash, icon: 'money' },
+  { id: 'cash', label: T.kindCash, icon: 'cash' },
 ];
 
-export function AccountForm({ account, onClose, onSaved }: { account?: Account; onClose: () => void; onSaved?: (id: string) => void }) {
+/** `cardOnly`: thêm / sửa thẻ ngay ở tab Thẻ, chỉ còn tên và 2 ngày. */
+export function AccountForm({ account, cardOnly, onClose, onSaved }: { account?: Account; cardOnly?: boolean; onClose: () => void; onSaved?: (id: string) => void }) {
   const { data, dispatch } = useStore();
   const [name, setName] = useState(account?.name ?? '');
-  const [kind, setKind] = useState<AccountKind>(account?.kind ?? 'bank');
+  const [kind, setKind] = useState<AccountKind>(account?.kind ?? (cardOnly ? 'credit' : 'bank'));
+  // Thẻ tín dụng: ngày chốt / hạn trả riêng (0 = dùng ngày chung).
+  const [cutoffDay, setCutoffDay] = useState(account?.cutoffDay ?? data.settings.cutoffDay);
+  const [dueDay, setDueDay] = useState(account?.dueDay ?? data.settings.dueDay);
   const used = account && data.transactions.some((t) => t.accountId === account.id || t.toAccountId === account.id);
+  // Nguồn đang có giao dịch: xoá thì chuyển giao dịch sang nguồn khác.
+  const others = data.accounts.filter((a) => a.id !== account?.id);
+  const [moveTo, setMoveTo] = useState(others.find((a) => a.kind !== 'credit')?.id ?? others[0]?.id ?? '');
 
   return (
-    <Sheet title={account ? T.accountTitleEdit : T.accountTitleNew} onClose={onClose}>
+    <Sheet title={cardOnly ? (account ? L.card.editCard : L.card.addCard) : account ? T.accountTitleEdit : T.accountTitleNew} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
           e.preventDefault();
           if (!name.trim()) return;
           const id = account?.id ?? uid();
-          dispatch({ type: 'upsertAccount', account: { id, name: name.trim(), kind } });
+          // Giữ số dư đã nhập khi đổi tên / loại.
+          const days = kind === 'credit' ? { cutoffDay, dueDay } : { cutoffDay: undefined, dueDay: undefined };
+          dispatch({ type: 'upsertAccount', account: { ...account, id, name: name.trim(), kind, ...days } });
           onSaved?.(id);
           onClose();
         }}
@@ -40,31 +49,62 @@ export function AccountForm({ account, onClose, onSaved }: { account?: Account; 
           <span>{T.accountName}</span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={T.accountNamePlaceholder} autoFocus={!isTouch} required />
         </label>
-        <div className="kind-grid" role="radiogroup" aria-label={T.accountKindAria}>
-          {accountKinds.map((k) => (
-            <button type="button" role="radio" key={k.id} aria-checked={kind === k.id} onClick={() => setKind(k.id)}>
-              <Icon name={k.icon} />
-              {k.label}
-            </button>
-          ))}
-        </div>
+        {!cardOnly && (
+          <div className="kind-grid" role="radiogroup" aria-label={T.accountKindAria}>
+            {accountKinds.map((k) => (
+              <button type="button" role="radio" key={k.id} aria-checked={kind === k.id} onClick={() => setKind(k.id)}>
+                <Art name={k.icon} />
+                {k.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {kind === 'credit' && (
+          <div className="field-row">
+            <label className="field">
+              <span>{T.cardCutoff}</span>
+              <NumberInput min={1} max={31} value={cutoffDay} onChange={setCutoffDay} />
+            </label>
+            <label className="field">
+              <span>{T.cardDue}</span>
+              <NumberInput min={1} max={31} value={dueDay} onChange={setDueDay} />
+            </label>
+          </div>
+        )}
         <button type="submit" className="btn btn--primary btn--block" disabled={!name.trim()}>
           {T.save}
         </button>
+        {account && used && others.length > 0 && (
+          <label className="field">
+            <span>{T.moveTo}</span>
+            <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+              {others.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {account && (
           <button
             type="button"
             className="btn btn--danger-ghost btn--block"
-            disabled={used}
-            title={used ? T.accountInUseTitle : undefined}
+            disabled={used && !others.length}
             onClick={() => {
-              if (confirm(t(T.confirmDeleteAccount, { name: account.name }))) {
+              const target = others.find((a) => a.id === moveTo);
+              if (used && target) {
+                if (confirm(t(T.confirmMergeAccount, { name: account.name, to: target.name }))) {
+                  dispatch({ type: 'mergeAccount', from: account.id, to: target.id });
+                  onClose();
+                }
+              } else if (confirm(t(T.confirmDeleteAccount, { name: account.name }))) {
                 dispatch({ type: 'deleteAccount', id: account.id });
                 onClose();
               }
             }}
           >
-            {used ? T.inUseCannotDelete : T.delete}
+            {used ? T.deleteAndMove : T.delete}
           </button>
         )}
       </form>
@@ -111,7 +151,7 @@ export function CategoryForm({
       >
         <div className="cat-preview">
           <span className="cat-badge" style={{ width: 64, height: 64, color, background: `${color}26` }}>
-            <Icon name={iconName} size={34} />
+            <Art name={iconName} size={44} />
           </span>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder={T.categoryNamePlaceholder} autoFocus={!isTouch} required className="note-input" />
         </div>
@@ -140,7 +180,7 @@ export function CategoryForm({
               style={iconName === n ? { color, background: `${color}26`, borderColor: color } : undefined}
               onClick={() => setIconName(n)}
             >
-              <Icon name={n} />
+              <Art name={n} />
             </button>
           ))}
         </div>

@@ -1,4 +1,4 @@
-import type { AppData, Person, Settings, SplitPreset, Transaction, TxSplit } from './types';
+import type { AppData, ISODate, Person, Settings, SplitPreset, Transaction, TxSplit } from './types';
 import { L } from '../labels';
 
 /** "Mình trả" (không chia) luôn đứng đầu; các cách chia còn lại người dùng tự sửa / xoá / thêm. */
@@ -42,6 +42,31 @@ export function splitsOf(t: Transaction): TxSplit[] {
   if (t.splits) return t.splits;
   if (t.counterparty && t.amount !== t.myShare) return [{ person: t.counterparty, amount: t.amount - t.myShare, paid: t.reimbursed }];
   return [];
+}
+
+/** Phần đã trả lại có ghi ngày nhận. */
+export const loggedPaid = (x: TxSplit) => (x.log ?? []).reduce((a, e) => a + e.amount, 0);
+
+/** Phần đã trả lại không rõ ngày nhận (ghi bằng bản cũ). */
+export const unloggedPaid = (x: TxSplit) => x.paid - loggedPaid(x);
+
+/** Phần trả dư (vượt số nợ). */
+export const overPaid = (x: TxSplit) => (x.log ?? []).reduce((a, e) => a + (e.extra ?? 0), 0);
+
+/** Tổng tiền thực nhận từ người đó = đã trả + phần dư. */
+export const received = (x: TxSplit) => x.paid + overPaid(x);
+
+/**
+ * Đặt lại tổng tiền đã nhận của một người; phần chênh ghi vào log với ngày nhận `date`.
+ * Vượt số nợ thì nợ tính đủ, phần dư ghi riêng (`extra`) để vẫn cộng vào ví.
+ */
+export function setPaid(x: TxSplit, total: number, date: ISODate, ts = Date.now()): TxSplit {
+  const t = Math.max(0, total);
+  const next = Math.min(t, x.amount);
+  const delta = next - x.paid;
+  const extra = t - next - overPaid(x);
+  if (!delta && !extra) return x;
+  return { ...x, paid: next, log: [...(x.log ?? []), { date, amount: delta, ...(extra ? { extra } : {}), ts }] };
 }
 
 /**
@@ -117,7 +142,12 @@ export function mergeSamePeople(d: AppData): AppData {
     for (const x of splits) {
       const person = to(x.person)!;
       const same = out.find((y) => y.person === person);
-      if (same) Object.assign(same, { amount: same.amount + x.amount, paid: same.paid + x.paid });
+      if (same)
+        Object.assign(same, {
+          amount: same.amount + x.amount,
+          paid: same.paid + x.paid,
+          log: same.log || x.log ? [...(same.log ?? []), ...(x.log ?? [])] : undefined,
+        });
       else out.push({ ...x, person });
     }
     return out;
@@ -172,4 +202,81 @@ export function migratePresets(s: Settings, txs: Transaction[]): SplitPreset[] {
   const used = (p: SplitPreset) => txs.some((t) => t.counterparty === p.counterparty && t.amount !== 0 && shareFor(p, t.amount) === t.myShare);
   const kept = [legacyPresets.third, ...defaultPresets, legacyPresets.company].filter((p) => defaultPresets.includes(p) || used(p));
   return [...kept, ...(s.splitPresets ?? [])];
+}
+
+/**
+ * Một người trả một cục: trừ vào khoản cũ nhất trước, hết tiền thì dừng (khoản cuối có thể chỉ trả một phần).
+ * Trả nhiều hơn tổng nợ: các khoản tính đủ, phần dư ghi vào khoản cuối (`extra`) để vẫn cộng vào ví.
+ */
+export function payOldestFirst(txs: Transaction[], who: string, amount: number, date: ISODate, ts = Date.now()) {
+  const part = (t: Transaction) => splitsOf(t).find((x) => x.person === who);
+  const owed = (t: Transaction) => {
+    const x = part(t);
+    return x ? x.amount - x.paid : 0;
+  };
+  const open = txs.filter((t) => owed(t) > 0).sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const out: Transaction[] = [];
+  let money = Math.max(0, amount);
+  let full = 0;
+  let partial: { tx: Transaction; left: number } | undefined;
+  open.forEach((t, i) => {
+    if (money <= 0) return;
+    const x = part(t)!;
+    const pay = Math.min(money, owed(t));
+    money -= pay;
+    // Khoản cuối cùng: dồn luôn phần dư.
+    const extra = i === open.length - 1 ? money : 0;
+    if (extra) money = 0;
+    const next = setPaid(x, received(x) + pay + extra, date, ts);
+    out.push({ ...t, splits: splitsOf(t).map((y) => (y.person === who ? next : y)), counterparty: undefined, reimbursed: 0 });
+    if (pay === owed(t)) full++;
+    else partial = { tx: t, left: owed(t) - pay };
+  });
+  const total = open.reduce((a, t) => a + owed(t), 0);
+  return { txs: out, full, partial, extra: Math.max(0, amount - total) };
+}
+
+/** Một lần nhận tiền của một người (các dòng log cùng `ts`), mới nhất lên đầu. */
+export interface Receipt {
+  ts: number;
+  date: ISODate;
+  total: number;
+  items: { tx: Transaction; amount: number }[];
+}
+
+export function receiptsOf(txs: Transaction[], who: string): Receipt[] {
+  const m = new Map<number, Receipt>();
+  for (const tx of txs)
+    for (const x of splitsOf(tx))
+      if (x.person === who)
+        for (const e of x.log ?? []) {
+          const amount = e.amount + (e.extra ?? 0);
+          if (!amount) continue;
+          const r = m.get(e.ts) ?? { ts: e.ts, date: e.date, total: 0, items: [] };
+          r.total += amount;
+          r.items.push({ tx, amount });
+          m.set(e.ts, r);
+        }
+  return [...m.values()].sort((a, b) => b.ts - a.ts);
+}
+
+/** Xoá một lần nhận tiền: bỏ các dòng log cùng `ts`, số đã trả lùi lại đúng phần đó. */
+export function undoReceipt(txs: Transaction[], who: string, ts: number): Transaction[] {
+  const out: Transaction[] = [];
+  for (const tx of txs) {
+    const splits = splitsOf(tx);
+    const hit = splits.some((x) => x.person === who && x.log?.some((e) => e.ts === ts));
+    if (!hit) continue;
+    out.push({
+      ...tx,
+      counterparty: undefined,
+      reimbursed: 0,
+      splits: splits.map((x) => {
+        if (x.person !== who || !x.log) return x;
+        const gone = x.log.filter((e) => e.ts === ts).reduce((a, e) => a + e.amount, 0);
+        return { ...x, paid: x.paid - gone, log: x.log.filter((e) => e.ts !== ts) };
+      }),
+    });
+  }
+  return out;
 }

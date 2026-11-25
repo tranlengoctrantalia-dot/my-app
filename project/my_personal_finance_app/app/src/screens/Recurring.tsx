@@ -5,7 +5,7 @@ import { dm, money, uid } from '../domain/format';
 import { allPresets, peopleOf, personName, presetLabel } from '../domain/split';
 import type { Recurring } from '../domain/types';
 import { useStore } from '../store';
-import { Card, MoneyInput, NumberInput, Sheet } from '../components/ui';
+import { Empty, Card, MoneyInput, NumberInput, Sheet, Info } from '../components/ui';
 import { CatBadge, Icon } from '../components/icons';
 import { L } from '../labels';
 import { t } from '../i18n';
@@ -19,9 +19,8 @@ export function RecurringSection() {
   const today = todayISO();
   return (
     <Card>
-      <p className="hint">{R.hint}</p>
       {list.length === 0 ? (
-        <p className="empty">{R.empty}</p>
+        <Empty art="calendar">{R.empty}</Empty>
       ) : (
         <ul className="plain-list">
           {list.map((r) => (
@@ -140,10 +139,12 @@ function RecurringForm({ item, onClose }: { item?: Recurring; onClose: () => voi
           </label>
         </div>
         <label className="field">
-          <span>{R.day}</span>
+          <span>
+            {R.day}
+            <Info>{R.dayHint}</Info>
+          </span>
           <NumberInput min={1} max={31} value={day} onChange={setDay} />
         </label>
-        <p className="hint">{R.dayHint}</p>
         {!income && (
           <label className="field">
             <span>{R.split}</span>
@@ -172,7 +173,7 @@ function RecurringForm({ item, onClose }: { item?: Recurring; onClose: () => voi
           <label className="switch-row">
             <span>
               {R.pause}
-              <small>{R.pauseHint}</small>
+              <Info>{R.pauseHint}</Info>
             </span>
             <input type="checkbox" checked={paused} onChange={(e) => setPaused(e.target.checked)} />
           </label>

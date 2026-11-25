@@ -1,8 +1,9 @@
-import { Icon, type IconName } from '../components/icons';
+import { Art, Icon, type IconName } from '../components/icons';
 import { sharedEnabled } from '../shared/config';
 import { resetTours } from '../components/Tour';
 import { L } from '../labels';
 import { Rich } from '../i18n';
+import { NewsCard } from '../components/WhatsNew';
 
 const G = L.guide;
 
@@ -84,13 +85,14 @@ export function Guide() {
         </span>
         <Icon name="right" size={18} />
       </button>
+      <NewsCard />
       {items
         .filter((i) => i.show !== false)
         .map((i) => (
           <details key={i.q} className="guide__item">
             <summary>
               <span className="mini-icon">
-                <Icon name={i.icon} size={18} />
+                <Art name={i.icon} size={24} />
               </span>
               <b>{i.q}</b>
               <Icon name="right" size={18} className="guide__chev" />

@@ -40,7 +40,7 @@ const key = (merchant: string) =>
 
 export function learnedCategories(data: AppData) {
   const votes = new Map<string, Map<string, number>>();
-  for (const t of data.transactions) {
+  for (const t of data.transactions.filter((x) => !x.cancelled)) {
     if (t.kind === 'income') continue;
     const k = key(t.merchant);
     if (!k) continue;

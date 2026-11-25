@@ -1,23 +1,26 @@
 import { useState } from 'react';
-import { budgetReport, incomeIn, shiftPeriod, todayISO, type BudgetRow } from '../domain/calc';
-import { money, uid } from '../domain/format';
-import type { Budget as BudgetT, CategoryKind, PeriodKey } from '../domain/types';
+import { budgetReport, incomeIn, installmentProgress, monthOf, monthRange, shiftPeriod, todayISO, type BudgetRow } from '../domain/calc';
+import { BUFFER_GOAL, budgetRoom, bufferGoal, bufferHave, bufferSuggest, fitBudget, nextMonths } from '../domain/coach';
+import { money, periodLabel, uid } from '../domain/format';
+import type { Budget as BudgetT, CategoryKind, Installment, PeriodKey } from '../domain/types';
 import { useLookups, useStore } from '../store';
-import { Empty, MoneyInput, PeriodPicker, Sheet } from '../components/ui';
+import { Empty, MoneyInput, PeriodPicker, Sheet, Info } from '../components/ui';
+import { InstallmentForm } from './CardStatement';
 import { CatBadge, Icon, catColor } from '../components/icons';
 import { planBudget } from '../domain/insights';
 import { L } from '../labels';
+import { NewTip } from '../components/WhatsNew';
 import { t, Rich } from '../i18n';
 
 const groups: { kind: CategoryKind; title: string }[] = [
   { kind: 'fixed', title: L.budget.groupFixed },
   { kind: 'spend', title: L.budget.groupSpend },
-  { kind: 'installment', title: L.budget.groupInstallment },
 ];
 
 const viewGroups: { kinds: CategoryKind[]; title: string }[] = [
   { kinds: ['spend'], title: L.budget.viewSpend },
-  { kinds: ['fixed', 'installment'], title: L.budget.viewFixed },
+  { kinds: ['fixed'], title: L.budget.viewFixed },
+  { kinds: ['installment'], title: L.budget.groupInstallment },
 ];
 
 export function Budget({ period, setPeriod }: { period: PeriodKey; setPeriod: (p: PeriodKey) => void }) {
@@ -25,11 +28,22 @@ export function Budget({ period, setPeriod }: { period: PeriodKey; setPeriod: (p
   const { category } = useLookups();
   const [editing, setEditing] = useState(false);
   const [line, setLine] = useState<BudgetRow | null>(null);
+  const [inst, setInst] = useState<Installment | null>(null);
   const r = budgetReport(data, period);
   const prev = data.budgets.find((b) => b.period === shiftPeriod(period, -1));
 
   const rowsOf = (kinds: CategoryKind[]) =>
     [...r.rows, ...r.unbudgeted].filter((row) => kinds.includes(category(row.categoryId)?.kind ?? 'spend'));
+  // Trả góp chưa tới kỳ góp đầu (vd. quẹt sau ngày chốt → góp từ tháng sau): vẫn hiện để biết là đã ghi.
+  const upcoming = data.installments.filter((i) => i.firstPeriod > period);
+
+  // Ngân sách lố: giảm đều các mục ăn tiêu cho vừa, xem trước rồi mới lưu.
+  const fit = r.unallocated < 0 ? fitBudget(data, period) : undefined;
+  function applyFit() {
+    if (!fit) return;
+    const lines = fit.changes.map((c) => `${category(c.categoryId)?.name ?? ''}: ${money(c.from)} → ${money(c.to)}`).join('\n');
+    if (confirm(t(L.budget.fitConfirm, { lines }))) dispatch({ type: 'upsertBudget', budget: fit.budget });
+  }
 
   return (
     <div className="stack">
@@ -37,7 +51,7 @@ export function Budget({ period, setPeriod }: { period: PeriodKey; setPeriod: (p
 
       {!r.budget ? (
         <div className="empty-cta">
-          <Empty>{L.budget.empty}</Empty>
+          <Empty art="target">{L.budget.empty}</Empty>
           {prev && (
             <button className="btn btn--primary btn--block" onClick={() => dispatch({ type: 'upsertBudget', budget: { ...prev, period } })}>
               {L.budget.reusePrev}
@@ -52,36 +66,153 @@ export function Budget({ period, setPeriod }: { period: PeriodKey; setPeriod: (p
           <div className="income-bar">
             <span>
               <Rich text={L.budget.incomeBar} vars={{ amount: r.income ? money(r.income) : '—' }} />
-              {r.income > 0 && r.unallocated !== 0 && (
-                <small className={r.unallocated < 0 ? 'neg' : 'muted'}>
-                  {t(r.unallocated > 0 ? L.budget.unallocated : L.budget.overAllocated, { amount: money(Math.abs(r.unallocated)) })}
+              {r.income > 0 && (
+                <small className={r.unallocated < 0 ? 'neg' : r.unallocated === 0 ? 'pos' : 'muted'}>
+                  {r.unallocated === 0 ? L.budget.exact : t(r.unallocated > 0 ? L.budget.unallocated : L.budget.overAllocated, { amount: money(Math.abs(r.unallocated)) })}
                 </small>
               )}
+              {fit && (
+                <button className="link" data-tour="fit" onClick={applyFit}>
+                  {L.budget.fitBtn}
+                </button>
+              )}
+              {fit && <NewTip id="fit" target="[data-tour='fit']" />}
             </span>
             <button className="btn btn--sm" onClick={() => setEditing(true)}>
               {L.budget.editBudget}
             </button>
           </div>
-          <p className="hint hint--center">{L.budget.tapHint}</p>
           {viewGroups.map((g) => {
             const rows = rowsOf(g.kinds);
-            if (rows.length === 0) return null;
+            const later = g.kinds.includes('installment') ? upcoming : [];
+            if (rows.length === 0 && later.length === 0) return null;
             return (
               <section key={g.title} className="card">
                 <h2 className="section-title">{g.title}</h2>
                 <ul className="budget-list">
-                  {rows.map((row) => (
-                    <BudgetItem key={row.categoryId} row={row} onClick={() => setLine(row)} />
+                  {rows.map((row) => {
+                    const item = data.installments.find((i) => i.categoryId === row.categoryId);
+                    return item ? (
+                      <InstallmentItem key={row.categoryId} item={item} period={period} onClick={() => setInst(item)} />
+                    ) : (
+                      <BudgetItem key={row.categoryId} row={row} onClick={() => setLine(row)} />
+                    );
+                  })}
+                  {later.map((item) => (
+                    <InstallmentItem key={item.id} item={item} period={period} onClick={() => setInst(item)} />
                   ))}
                 </ul>
               </section>
             );
           })}
+          <BudgetBalance period={period} />
         </>
       )}
       {editing && <BudgetForm period={period} budget={r.budget ?? prev} onClose={() => setEditing(false)} />}
       {line && r.budget && <BudgetLineSheet row={line} budget={r.budget} onClose={() => setLine(null)} />}
+      {inst && <InstallmentForm item={inst} onClose={() => setInst(null)} />}
     </div>
+  );
+}
+
+/**
+ * Ngân sách là gốc của mọi số "được tiêu bao nhiêu": lương − cố định − trả góp = được chi linh hoạt.
+ * Kết luận nằm trên đầu tab; ở đây là cách tính, 3 tháng tới, tiền đệm (một Mục tiêu → tự vào dòng tiết kiệm), bấm mới mở.
+ */
+function BudgetBalance({ period }: { period: PeriodKey }) {
+  const { data, dispatch } = useStore();
+  const C = L.coach;
+  const r = budgetRoom(data, period);
+  if (!r.income) return null;
+  const next = nextMonths(data, period);
+  const today = todayISO();
+  const goal = bufferGoal(data);
+  const sug = bufferSuggest(data, period, today);
+  const row = (label: string, amount: number, minus = false) => (
+    <div key={label}>
+      <dt>{label}</dt>
+      <dd>
+        {minus && amount > 0 ? '− ' : ''}
+        {money(amount)}
+      </dd>
+    </div>
+  );
+  return (
+    <section className="card card--folds">
+      <details className="fold">
+        <summary>{C.balanceTitle}</summary>
+        <dl className="ledger ledger--sheet">
+          {row(C.income, r.income)}
+          {row(C.fixed, r.fixed, true)}
+          {r.installments > 0 && row(C.installments, r.installments, true)}
+          <div className="ledger__total">
+            <dt>{C.room}</dt>
+            <dd>{money(r.room)}</dd>
+          </div>
+          {row(C.planned, r.flexPlanned)}
+        </dl>
+      </details>
+
+      <details className="fold">
+        <summary>{C.nextTitle}</summary>
+        <dl className="ledger ledger--sheet">
+          {next.map((m) => (
+            <div key={m.month}>
+              <dt>{t(C.nextRow, { m: Number(m.month.slice(5, 7)) })}</dt>
+              <dd>{money(m.room)}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>
+
+      <details className="fold">
+        <summary>{C.bufferTitle}</summary>
+        {goal ? (
+          <p className="hint">{t(C.bufferHave, { have: money(bufferHave(data, today)), target: money(goal.target) })}</p>
+        ) : (
+          sug.target > 0 && (
+            <>
+              <p className="hint">{t(C.bufferSuggest, { target: money(sug.target), monthly: money(sug.monthly) })}</p>
+              <button
+                className="btn btn--block"
+                onClick={() => dispatch({ type: 'upsertGoal', goal: { id: BUFFER_GOAL, name: C.bufferName, icon: '🛟', target: sug.target, deadline: sug.deadline, deposits: [] } })}
+              >
+                {C.bufferCreate}
+              </button>
+            </>
+          )
+        )}
+      </details>
+    </section>
+  );
+}
+
+/** Dòng trả góp: tới kỳ mấy, còn bao nhiêu; thiếu kỳ hạn thì chạm vào nhập. */
+function InstallmentItem({ item, period, onClick }: { item: Installment; period: PeriodKey; onClick: () => void }) {
+  const prog = installmentProgress(item, period);
+  return (
+    <li>
+      <button className="budget-item" onClick={onClick}>
+        <CatBadge id={item.categoryId} size={36} />
+        <div className="budget-item__body">
+          <div className="split-line">
+            <span>{item.name}</span>
+            <span className={prog || period < item.firstPeriod ? 'muted' : 'neg'}>
+              {period < item.firstPeriod
+                ? t(L.budget.instStarts, { period: periodLabel(item.firstPeriod), amount: money(item.monthly) })
+                : prog
+                  ? prog.left > 0
+                    ? t(L.card.progress, { paid: prog.paid, months: item.months!, amount: money(prog.amountLeft) })
+                    : L.budget.instDone
+                  : L.budget.instNoTerm}
+            </span>
+          </div>
+          <div className="bars__track">
+            <div style={{ width: `${prog ? (prog.paid / item.months!) * 100 : 0}%`, background: 'var(--accent)' }} />
+          </div>
+        </div>
+      </button>
+    </li>
   );
 }
 
@@ -167,7 +298,8 @@ function BudgetLineSheet({ row, budget, onClose }: { row: BudgetRow; budget: Bud
                 type: 'upsertTx',
                 tx: {
                   id: uid(),
-                  date: todayISO(),
+                  // Ghi vào đúng tháng đang xem (xem tháng cũ thì ghi ngày cuối tháng đó).
+                  date: monthOf(todayISO()) === budget.period ? todayISO() : monthRange(budget.period).end,
                   merchant: c?.name ?? L.budget.fixedTxName,
                   amount: row.remaining,
                   myShare: row.remaining,
@@ -206,7 +338,8 @@ function BudgetForm({ period, budget, onClose }: { period: PeriodKey; budget?: B
   const [limits, setLimits] = useState<Record<string, number>>(() =>
     Object.fromEntries(data.categories.map((c) => [c.id, budget?.lines.find((l) => l.categoryId === c.id)?.limit ?? 0])),
   );
-  const total = Object.values(limits).reduce((a, b) => a + b, 0);
+  // Đã chia gồm cả trả góp thật của tháng (ô trả góp nếu có nhập thì không cộng, tránh trừ 2 lần).
+  const total = budgetRoom(data, period).installments + data.categories.filter((c) => c.kind !== 'installment').reduce((a, c) => a + (limits[c.id] ?? 0), 0);
   const [savePct, setSavePct] = useState(20);
   const plan = planBudget(data, period, income, savePct, limits);
   const [applied, setApplied] = useState(false);
@@ -270,11 +403,13 @@ function BudgetForm({ period, budget, onClose }: { period: PeriodKey; budget?: B
                   <dd>{money(plan.saving)}</dd>
                 </div>
                 <div className="plan__total">
-                  <dt>= {L.suggest.flexible}</dt>
+                  <dt>
+                    = {L.suggest.flexible}
+                    <Info>{plan.flexible <= 0 ? L.suggest.short : plan.byHabit ? L.suggest.byHabit : L.suggest.even}</Info>
+                  </dt>
                   <dd>{money(plan.flexible)}</dd>
                 </div>
               </dl>
-              <p className="hint">{plan.flexible <= 0 ? L.suggest.short : plan.byHabit ? L.suggest.byHabit : L.suggest.even}</p>
               <button
                 type="button"
                 className="btn btn--block"

@@ -4,7 +4,7 @@ import { todayISO } from '../domain/calc';
 import { dayLabel, money, uid } from '../domain/format';
 import { useStore } from '../store';
 import { isTouch } from '../viewport';
-import { Card, Empty, MoneyInput, Sheet } from '../components/ui';
+import { Card, Empty, MoneyInput, Sheet, Info } from '../components/ui';
 import { Icon } from '../components/icons';
 import { balances, settlements, splitEqually, totals, type Ledger, type SharedEntry } from '../shared/balance';
 import { clearJoinLink, inviteLink } from '../shared/config';
@@ -206,7 +206,6 @@ function LedgerView({ ledger, me, onLeft }: { ledger: Ledger; me: User; onLeft: 
                     <b>
                       {name(p.from)} → {name(p.to)}
                     </b>
-                    <small>{L.shared.tapWhenPaid}</small>
                   </span>
                   <b>{money(p.amount)}</b>
                 </button>
@@ -478,7 +477,7 @@ function EntryForm({
             <label className="switch-row">
               <span>
                 {L.shared.form.toWallet}
-                <small>{L.shared.form.toWalletSub}</small>
+                <Info>{L.shared.form.toWalletSub}</Info>
               </span>
               <input type="checkbox" checked={toWallet} onChange={(e) => setToWallet(e.target.checked)} />
             </label>

@@ -33,7 +33,11 @@ function sameMerchant(a: string, b: string) {
   return [...words(b)].some((w) => wa.has(w));
 }
 
-export function reconcile(data: AppData, accountId: string, lines: StatementLine[]): Reconciled {
+/**
+ * `range`: kỳ sao kê (theo ngày chốt). Khoản trong app ngoài kỳ không bị báo thừa (kỳ trước đã trả / kỳ sau chưa chốt),
+ * nhưng vẫn được ghép khớp nếu ngân hàng ghi lệch ngày.
+ */
+export function reconcile(data: AppData, accountId: string, lines: StatementLine[], range?: { start: ISODate; end: ISODate }): Reconciled {
   if (!lines.length) return { matched: [], missing: [], extra: [], mismatched: [] };
   const dates = lines.map((l) => l.date).sort();
   const from = shift(dates[0], -DAY_SLACK);
@@ -63,9 +67,14 @@ export function reconcile(data: AppData, accountId: string, lines: StatementLine
       mismatched.push({ line, tx: near });
     } else missing.push(line);
   }
-  // Còn lại trong app: thừa. Có khoản khớp cùng số tiền, gần ngày → nhiều khả năng ghi trùng.
+  // Khoản đã huỷ mà sao kê có dòng hoàn đúng số tiền: cặp trừ + hoàn coi là khớp.
+  for (const tx of txs.filter((t) => t.cancelled)) {
+    const i = missing.findIndex((l) => l.amount === -tx.amount && l.date >= shift(tx.date, -DAY_SLACK));
+    if (i >= 0) matched.push({ line: missing.splice(i, 1)[0], tx });
+  }
+  // Còn lại trong app: thừa (khoản đã huỷ thì không). Có khoản khớp cùng số tiền, gần ngày → nhiều khả năng ghi trùng.
   const extra = txs
-    .filter((t) => !used.has(t.id))
+    .filter((t) => !used.has(t.id) && !t.cancelled && (!range || (t.date >= range.start && t.date <= range.end)))
     .map((tx) => ({ tx, dup: matched.some((m) => m.tx.amount === tx.amount && days(m.tx.date, tx.date) <= DAY_SLACK) }));
   return { matched, missing, extra, mismatched };
 }

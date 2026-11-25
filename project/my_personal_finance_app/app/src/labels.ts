@@ -15,6 +15,7 @@ export const L = {
   /* ============ CHỮ DÙNG CHUNG ============ */
   /* Chữ dùng chung ở nhiều chỗ */
   common: {
+    info: 'Giải thích',
     // Nút chung
     close: 'Đóng',
     done: 'Xong',
@@ -56,8 +57,7 @@ export const L = {
     },
     // Các nút tròn góc trên
     account: 'Tài khoản',
-    lightMode: 'Giao diện sáng',
-    darkMode: 'Giao diện tối',
+    darkMode: 'Nền tối',
     shared: 'Sổ chung',
     settings: 'Cài đặt',
   },
@@ -112,7 +112,7 @@ export const L = {
     customizeHint: 'Tắt bớt những ô bạn ít xem cho gọn. Bật lại lúc nào cũng được.',
     blocks: {
       wealth: 'Tài sản',
-      card: 'Trả thẻ',
+      card: 'Khả năng thanh toán',
       owed: 'Người khác nợ bạn',
       owe: 'Bạn đang nợ',
       goals: 'Mục tiêu tiết kiệm',
@@ -127,6 +127,7 @@ export const L = {
     // Ô lớn trên cùng — khi đã đặt ngân sách
     heroLeft: 'Còn tiêu được',
     heroOver: 'Tiêu lố',
+    heroPerDay: '≈ {amount}/ngày cho {n} ngày còn lại',
     // Ô lớn trên cùng — khi chưa đặt ngân sách
     heroSpent: 'Đã tiêu tháng này',
     heroHint: 'Chạm để đặt ngân sách →',
@@ -134,8 +135,7 @@ export const L = {
     cardDue: 'Trả thẻ {date}',
     cardDaysLeft: 'còn {n} ngày',
     cardOverdue: 'quá hạn',
-    cardSurplus: 'dư {amount}',
-    cardShort: 'thiếu {amount}',
+    cardPaid: 'Đã trả xong kỳ này',
     // Dòng người khác đang nợ mình
     partnerOwes: '{name} nợ',
     companyOwes: 'Công ty nợ',
@@ -143,7 +143,7 @@ export const L = {
     manyOwe: 'Mọi người nợ bạn',
     manyOweSub: '{n} người · {k} khoản',
     // Dòng đã chi / đã thu
-    spent: 'Đã tiêu',
+    spent: 'Chi linh hoạt',
     spentCount: '{n} giao dịch',
     earned: 'Đã thu',
     earnedCount: '{n} khoản',
@@ -161,6 +161,7 @@ export const L = {
     tileWealth: 'Tài sản',
     tileWealthEmpty: 'Nhập số dư',
     tileWealthHint: 'Biết mình đang có bao nhiêu',
+    tileWealthCash: 'Trong ví',
     tileWealthSub: '{n} ví / tài khoản',
     tileTrend: 'Tổng chi tháng này',
     // Khung các khoản gần đây
@@ -182,30 +183,40 @@ export const L = {
     kindIncome: 'Thu',
     kindRefund: 'Hoàn',
     aiScan: 'AI quét',
-    refundHint: 'Tiền được trả lại (trả hàng, huỷ đơn, hoàn tiền thẻ). Trừ bớt vào chi tiêu của danh mục bạn chọn.',
+    instLabel: 'Trả góp',
+    instConvert: 'Chuyển thành trả góp',
+    instNeedCard: 'Chỉ khoản quẹt thẻ tín dụng',
+    instFee: 'Phí chuyển đổi (1 lần)',
+    instFeeFirst: 'phí {amount} tính vào {period}',
+    instTerm: 'Số kỳ (tháng)',
+    instResult: '{monthly}/tháng · xong {period}',
+    instOver: 'lố ngân sách {amount}',
+    pickTerm: 'Chọn số kỳ',
+    dupInst: 'Trùng trả góp {name}: app đã tự tính mỗi tháng.',
+    dupInstDrop: 'Bỏ khoản này',
+    looksInst: 'Khoản trả góp? Bật để app tự tính mỗi tháng.',
+    looksInstOn: 'Bật trả góp',
+    refundHint: 'Tiền được trả lại. Trừ vào chi tiêu.',
 
     // Nút "Chuyển": chuyển tiền giữa các ví / tài khoản của mình
     kindTransfer: 'Chuyển',
     titleTransfer: 'Chuyển tiền',
-    transferHint: 'Chuyển giữa các nguồn của bạn: trả nợ thẻ, nạp Momo, rút tiền mặt… Không tính là chi hay thu.',
+    transferHint: 'Trả thẻ, nạp Momo, rút tiền… Không tính là chi.',
     fromLabel: 'Từ',
     toLabel: 'Sang',
     notePlaceholderTransfer: 'Trả nợ thẻ, nạp Momo…',
     defaultNameTransfer: 'Chuyển tiền',
     // Ghi nhầm trả nợ thẻ thành khoản chi
-    cardPayWarn: 'Trả nợ thẻ thì ghi bằng **Chuyển** (từ tài khoản sang thẻ). Ghi bằng Chi sẽ bị tính là tiêu thêm, vì các món mua bằng thẻ đã được tính rồi.',
+    cardPayWarn: 'Trả thẻ thì dùng **Chuyển**, không dùng Chi.',
     cardPaySwitch: 'Đổi sang Chuyển',
     cardPayName: 'Trả thẻ',
     sameAccount: 'Chọn hai nguồn khác nhau',
 
     // Công tắc lặp lại (chỉ khi thêm khoản mới)
     repeatLabel: 'Lặp lại hàng tháng',
-    // Đóng trước nhiều tháng (vd. quỹ T10 + T11)
-    spreadLabel: 'Đóng trước cho nhiều tháng',
-    spreadExample: 'Vd. đóng quỹ cho cả T10 + T11',
+    // Nhãn khoản cũ đã chia nhiều tháng
     spreadN: '{n} tháng',
-    spreadHint: 'Ngân sách mỗi tháng tính {amount}, trong {n} tháng. Ví / thẻ vẫn trừ đủ hôm nay.',
-    repeatHint: 'Tự ghi vào ngày {day} mỗi tháng. Sửa hoặc tạm dừng ở Cài đặt → Khoản định kỳ.',
+    repeatHint: 'Tự ghi ngày {day} mỗi tháng.',
 
     // Ô số tiền
     amountPlaceholder: '0',
@@ -268,6 +279,9 @@ export const L = {
     pickCategory: 'Chọn danh mục',
     enterAmount: 'Nhập số tiền',
     delete: 'Xóa',
+    cancelled: 'Đã huỷ',
+    cancelledHint: 'Giữ trong Sổ chi nhưng không tính tiền',
+    cancelRefundConfirm: 'Có khoản hoàn {amount} ngày {date}. Huỷ luôn?',
     confirmDelete: 'Xóa khoản này?',
 
     // Hướng dẫn lần đầu mở bảng
@@ -290,9 +304,21 @@ export const L = {
     searchAria: 'Tìm giao dịch',
     // Khi không có khoản nào
     empty: 'Chưa có khoản nào',
+    emptyAdd: 'Ghi khoản đầu tiên',
     // Trên từng dòng giao dịch có chia tiền
     sharedTag: 'chia',
+    mergeStart: 'Gộp trả góp',
+    mergeHint: 'Chọn các khoản chuyển trả góp cùng lúc',
+    mergeBar: 'Đã chọn {n} khoản · {amount}',
+    mergeNext: 'Tiếp',
+    mergeCancel: 'Huỷ',
+    mergeTitle: 'Gộp thành trả góp',
+    mergeName: 'Tên khoản trả góp',
+    mergeOneCard: 'Các khoản phải cùng một thẻ',
+    mergeSave: 'Lưu trả góp',
     myShare: 'mình {amount}',
+    instTag: 'đã chuyển trả góp',
+    cancelledTag: 'Đã huỷ',
     // Dòng chuyển tiền giữa hai nguồn
     transferMeta: '{from} → {to}',
   },
@@ -367,7 +393,7 @@ export const L = {
       maxLabel: 'Tối đa mỗi lần',
       maxOption: '{n} email',
       banksLabel: 'Chỉ đọc email của (không chọn = tất cả)',
-      customHint: 'Bạn đang có bộ lọc tự gõ (Cài đặt → AI nhập tự động) — xoá trống ô đó thì các giới hạn này mới có tác dụng.',
+      customHint: 'Đang dùng bộ lọc tự gõ trong Cài đặt nên giới hạn này chưa có tác dụng.',
     },
   },
 
@@ -383,8 +409,13 @@ export const L = {
     incomeBar: 'Lương **{amount}**',
     unallocated: 'chưa chia {amount}',
     overAllocated: 'lố {amount}',
+    exact: 'Vừa khít ✓',
+    instNoTerm: 'Thiếu kỳ hạn',
+    instDone: 'Đã trả xong',
+    instStarts: 'Bắt đầu góp {period} · {amount}/kỳ',
+    fitBtn: 'Giảm ăn tiêu cho vừa',
+    fitConfirm: 'Giảm đều các mục ăn tiêu cho vừa lương:\n\n{lines}\n\nLưu ngân sách mới?',
     editBudget: 'Sửa ngân sách',
-    tapHint: 'Chạm vào từng mục để sửa số tiền',
 
     // Tên nhóm khi xem ngân sách
     viewSpend: 'Chi tiêu',
@@ -433,9 +464,92 @@ export const L = {
 
   /* ============ THẺ TÍN DỤNG, TRẢ GÓP (và tên cột trong file Excel) ============ */
   /* Sao kê thẻ tín dụng (tab Thẻ) + bảng thêm / sửa trả góp */
+  coach: {
+    // Khi ghi khoản chi (theo Ngân sách)
+    txCatLeft: '{name} còn {amount}',
+    txCatOver: '{name} lố {amount}',
+    txFlexLeft: 'chi linh hoạt tháng {m} còn {amount}',
+    txFlexOver: 'chi linh hoạt tháng {m} lố {amount}',
+    // Khi thêm trả góp
+    instOk: 'Trả góp {monthly}/tháng → còn được chi linh hoạt {room}/tháng (ngân sách đang đặt {planned})',
+    instTight: 'Trả góp {monthly}/tháng → chỉ còn được chi linh hoạt {room}/tháng, ngân sách đang đặt {planned}: phải giảm',
+    instOver: 'Trả góp {monthly}/tháng → lương không đủ, thiếu {amount}/tháng',
+    // Nhắc đòi tiền
+    owedSoon: 'Đòi trước {date}',
+    owedLate: 'Trễ hẹn {date}',
+    // Tab Ngân sách: cân đối
+    balanceTitle: 'Ngân sách có cân không?',
+    income: 'Lương',
+    fixed: 'Khoản cố định',
+    installments: 'Trả góp',
+    room: 'Được chi linh hoạt',
+    planned: 'Đang đặt chi linh hoạt',
+    nextTitle: '3 tháng tới được chi linh hoạt',
+    nextRow: 'Tháng {m}',
+    bufferTitle: 'Tiền đệm khẩn cấp',
+    bufferSuggest: 'Nên có {target} · gom {monthly}/tháng',
+    bufferCreate: 'Tạo mục tiêu Tiền đệm',
+    bufferName: 'Tiền đệm khẩn cấp',
+    bufferHave: 'Tiền đệm đang có {have} / {target} · bỏ thêm ở Mục tiêu',
+  },
+  plan: {
+    title: 'Khả năng thanh toán tháng {month}',
+    tile: 'Khả năng thanh toán',
+    tileShort: 'Thiếu {amount}',
+    tileOk: 'Đủ tiền',
+    tileSubShort: 'Chưa bỏ tiết kiệm thì {result}',
+    tileSubOk: 'Ăn tiêu tối đa {amount}/ngày',
+    tileSurplus: 'dư {amount}',
+    tileStill: 'vẫn thiếu {amount}',
+    short: '👉 Thiếu {amount}',
+    surplus: '👉 Dư {amount}',
+    noSavingOk: 'Tháng này chưa bỏ tiết kiệm ({saving}) → dư {amount}',
+    noSavingShort: 'Tháng này chưa bỏ tiết kiệm ({saving}) → vẫn thiếu {amount}',
+    perDay: 'Từ hôm nay ăn tiêu mỗi ngày: {amount}',
+    perDayAria: 'Ăn tiêu mỗi ngày',
+    backToBudget: 'Về ngân sách {amount}',
+    maxPerDay: 'Tối đa {amount}/ngày',
+    noRoom: 'Không tiêu gì vẫn thiếu.',
+    flexOver: 'Ăn tiêu đã lố {amount} tháng này.',
+    have: '💰 Tiền có',
+    cash: 'Đang có trong ví',
+    salary: 'Lương {date}',
+    paysBack: '{name} trả lại',
+    needBy: 'nhận trước {date} ✎',
+    late: 'trễ hẹn {date} · không tính',
+    haveTotal: 'Tổng có',
+    pay: '💸 Tiền phải trả',
+    card: '{card} ({date})',
+    spend: 'Ăn tiêu {perDay} × {days} ngày',
+    payTotal: 'Tổng phải trả',
+    conditions: '⚠️ Điều kiện',
+    remind: 'Đòi {name} {amount} trước {date}',
+    dip: 'Tiền trả lại về sau {date} thì đúng ngày trả {card} hụt {amount} (cuối tháng vẫn đủ)',
+    lateNote: 'Ai trễ hẹn thì không tính vào Tiền có.',
+    stillShort: 'Thiếu {amount}: rút tiết kiệm cũ, bớt khoản cố định, hoặc trả thẻ tối thiểu (lãi ~2–3%/tháng).',
+    useBuffer: 'Dùng tiền đệm (đang có {amount}) trước khi đụng tiết kiệm.',
+    promiseLabel: 'Hẹn trả ngày',
+  },
   card: {
+    paidLine: 'Đã trả',
+    refundsAfter: 'Hoàn sau ngày chốt',
+    unsettle: 'Bỏ đánh dấu',
+    personOwes: '{name} còn nợ',
+    personPaid: '{name} đã trả',
+    allCards: 'Tất cả',
+    mineLine: 'Phần bạn tiêu',
+    // Tên kỳ ở tab Thẻ (khác "tháng" của ngân sách)
+    cycleLabel: 'Kỳ trả {date}',
+    cycleRange: 'Quẹt thẻ {range}',
+    // Khung "Đủ tiền trả không?"
+    enough: {
+      seeCards: 'Xem từng thẻ',
+    },
     // Ô chọn thẻ khi có nhiều thẻ
     chooseCard: 'Chọn thẻ',
+    addCard: 'Thêm thẻ',
+    editCard: 'Sửa thẻ',
+    details: 'Chi tiết',
 
     // Thẻ lớn trên cùng
     due: 'Hạn trả {date}',
@@ -444,8 +558,7 @@ export const L = {
     installmentLine: 'Trả góp {name}',
 
     // Mục "Theo danh mục"
-    byCategory: 'Theo danh mục',
-    payButton: 'Ghi đã trả thẻ',
+    payButton: 'Đã trả thẻ',
     txUnit: '{count} giao dịch',
 
     // Mục "Trả góp"
@@ -454,7 +567,7 @@ export const L = {
     empty: 'Chưa có',
     progress: 'Kỳ {paid}/{months} · còn {amount}',
     paidOff: 'Đã trả xong {period}',
-    tapToSetTerm: 'Chạm để nhập kỳ hạn',
+    tapToSetTerm: 'Thiếu kỳ hạn · chạm để nhập',
     rate: 'lãi {rate}%/năm',
     notStarted: 'chưa tới kỳ',
 
@@ -464,7 +577,6 @@ export const L = {
 
     // Bảng thêm / sửa trả góp
     editTitle: 'Sửa trả góp',
-    addTitle: 'Thêm trả góp',
     // Tên danh mục tự tạo cho mỗi khoản trả góp
     categoryName: 'Góp {name}',
     name: 'Tên',
@@ -540,6 +652,17 @@ export const L = {
 
   /* ============ CHIA TIỀN ============ */
   /* Chia tiền (tab người yêu / công ty trả lại) */
+  // Robot hỏi đáp về tiền
+  bot: {
+    open: 'Hỏi trợ lý tiền',
+    title: 'Trợ lý tiền',
+    hello: 'Chào bạn! Hỏi mình gì về tiền cũng được, mình xem số liệu trong app rồi trả lời.',
+    suggestions: ['Tháng này thiếu tiền thì làm sao?', 'Mình tiết kiệm thêm được bao nhiêu?', 'Tháng này tiêu lố ở đâu?', 'Ai còn nợ mình?'],
+    privacy: 'Chỉ gửi số tổng, không gửi từng giao dịch. Đóng là xoá chat.',
+    thinking: 'Đang xem số liệu…',
+    placeholder: 'Hỏi gì đó…',
+    send: 'Gửi',
+  },
   split: {
     // Tên bên kia khi là công ty (tên người yêu lấy trong Cài đặt)
     company: 'Công ty',
@@ -550,6 +673,23 @@ export const L = {
     empty: 'Chưa chia tiền với ai. Lúc ghi khoản chi, chọn Chia đều rồi chọn những người đi cùng.',
     settleAll: 'Đã trả đủ',
     settleAllConfirm: '{name} đã trả đủ {amount}?',
+    // Nhận một cục tiền: trừ vào khoản cũ nhất trước
+    receive: 'Nhận tiền',
+    receiveTitle: '{name} trả tiền',
+    receiveAmount: 'Số tiền nhận',
+    receiveHint: 'Trừ vào khoản cũ nhất trước.',
+    receiveFull: 'Trả đủ {n} khoản',
+    receivePartial: '{merchant} còn {left}',
+    receiveExtra: 'dư {amount} vào ví',
+    receiveSave: 'Lưu',
+    // Lịch sử nhận tiền
+    history: 'Lịch sử nhận tiền',
+    historyLine: '{n} khoản',
+    historyAll: 'Tất cả',
+    historyMeta: '{time} · vào {wallet} · {n} khoản',
+    historyTitle: '{date} · {amount}',
+    historyUndo: 'Xoá lần nhận này',
+    historyUndoConfirm: 'Xoá lần nhận {amount} ngày {date}?',
 
     // Danh sách đang chờ trả
     pending: 'Đang chờ ({count})',
@@ -567,6 +707,7 @@ export const L = {
     // Bảng nhập số tiền đã trả lại
     owed: 'Cần trả: **{amount}**',
     paid: 'Đã trả',
+    overHint: 'Trả dư {amount}: khoản này tính đủ, phần dư vẫn cộng vào ví.',
     payFull: 'Trả đủ',
     notPaid: 'Chưa trả',
     save: 'Lưu',
@@ -700,6 +841,9 @@ export const L = {
       dataSub: 'Xuất Excel, sao lưu',
     },
 
+    // Tên 4 nhóm ở màn Cài đặt
+    groups: { money: 'Tiền', remind: 'Nhắc nhở & khóa', look: 'Giao diện', data: 'Dữ liệu' },
+
     // Mục "Tiền & ngày trong tháng"
     money: {
       cashOnHand: 'Tiền đang có',
@@ -744,7 +888,7 @@ export const L = {
       confirmDelete: 'Xóa "{name}" khỏi danh sách? Các khoản đã chia với người này vẫn giữ nguyên.',
     },
     ratiosTitle: 'Tỉ lệ riêng',
-    ratiosHint: 'Lúc ghi khoản luôn có sẵn: Mình trả · Chia đều · Trả hộ · Tự nhập. Hay chia lệch thì thêm tỉ lệ riêng, vd. "Hẹn hò 1:2": mỗi người trả gấp đôi phần bạn.',
+    ratiosHint: 'Hay chia lệch thì thêm tỉ lệ riêng, vd. 1:2.',
     ratiosEmpty: 'Chưa có tỉ lệ riêng',
 
     // Bảng thêm / sửa cách chia
@@ -771,12 +915,13 @@ export const L = {
       getKeyAt: 'Lấy key tại',
       keyLocal: '. Key chỉ lưu trên máy này.',
       model: 'Mô hình Gemini',
+      modelOther: 'Tên khác…',
       privacyTitle: 'Bảo vệ thông tin',
       redact: 'Che thông tin cá nhân trước khi gửi AI',
       redactSub: 'Họ tên, số thẻ, số tài khoản, sđt, email, địa chỉ',
       privacyWords: 'Tên cần che (cách nhau dấu phẩy)',
       privacyWordsPlaceholder: 'Họ tên của bạn, tên người thân…',
-      privacyHint: 'Muốn tuyệt đối riêng tư: trong màn hình AI quét chọn "Trên máy" — đọc email, file PDF ngay trên điện thoại, không gửi đi đâu.',
+      privacyHint: 'Riêng tư tuyệt đối: chọn "Trên máy" khi quét.',
       gmailTitle: 'Gmail nhận sao kê',
       gmailPick: 'Chọn khi đọc email lần đầu',
       gmailChange: 'Đổi',
@@ -797,7 +942,7 @@ export const L = {
       login: 'Đăng nhập',
       gmailTitle: 'Gmail đọc sao kê',
       borrowedTitle: 'Dùng máy mượn / đưa máy cho người khác',
-      borrowedHint: 'Đăng xuất hết và xoá mọi dữ liệu của bạn trên máy này. App trở về như lúc mới cài.',
+      borrowedHint: 'Đăng xuất và xoá dữ liệu trên máy này.',
       wipeButton: 'Đăng xuất & xoá dữ liệu trên máy',
     },
 
@@ -806,11 +951,11 @@ export const L = {
       restoreConfirm: 'Thay toàn bộ dữ liệu hiện tại bằng file sao lưu?',
       badFile: 'File không đúng định dạng sao lưu của app.',
       viewTitle: 'Xem dữ liệu',
-      viewHint: 'File Excel gồm giao dịch, ngân sách, trả góp — mở bằng Excel hoặc Google Trang tính.',
+      viewHint: 'Giao dịch, ngân sách, trả góp.',
       exporting: 'Đang tạo file…',
       exportExcel: 'Xuất file Excel',
       jsonTitle: 'File sao lưu (.json)',
-      jsonHint: 'Dùng để chuyển dữ liệu sang máy khác hoặc khôi phục lại vào app, không dùng để xem.',
+      jsonHint: 'Để chuyển máy hoặc khôi phục, không để xem.',
       download: 'Tải về',
       restore: 'Khôi phục',
       resetTitle: 'Làm lại từ đầu',
@@ -835,9 +980,14 @@ export const L = {
     accountTitleNew: 'Thêm nguồn tiền',
     accountName: 'Tên',
     accountNamePlaceholder: 'Vietcombank, ZaloPay, Ví tiền mặt…',
+    cardCutoff: 'Ngày chốt sao kê',
+    cardDue: 'Ngày hạn trả',
     accountKindAria: 'Loại',
     accountInUseTitle: 'Đang có giao dịch dùng nguồn này',
     confirmDeleteAccount: 'Xóa {name}?',
+    confirmMergeAccount: 'Xóa {name}? Các giao dịch của {name} sẽ chuyển sang {to}.',
+    moveTo: 'Chuyển giao dịch sang',
+    deleteAndMove: 'Xóa (chuyển giao dịch sang nguồn khác)',
 
     // Loại danh mục (ba nút)
     catKindSpend: 'Chi tiêu',
@@ -954,7 +1104,7 @@ export const L = {
 
     reconcile: {
       q: 'Đối chiếu sao kê thẻ',
-      a: 'Tab **Thẻ** → **Đối chiếu sao kê** → chọn file sao kê PDF ngân hàng gửi. App chỉ ra khoản **chưa ghi** (bấm Thêm), khoản **lệch số tiền** (bấm Sửa), và khoản có trong app mà sao kê không có (nghi ghi trùng / nhầm thẻ).',
+      a: 'Tab **Thẻ** → **Đối chiếu sao kê** → chọn file sao kê PDF ngân hàng gửi. App chỉ ra khoản **chưa ghi** (bấm Thêm), khoản **lệch số tiền** (bấm Sửa), và khoản có trong app mà sao kê không có (nghi ghi trùng / nhầm thẻ) — chỉ xét khoản trong kỳ chốt đang xem.',
     },
 
     extras: {
@@ -964,7 +1114,8 @@ export const L = {
 
     goals: {
       q: 'Để dành cho mục tiêu (du lịch, mua máy…)',
-      a: 'Màn chính → thẻ **Mục tiêu** → **Thêm mục tiêu**: tên, số tiền cần, hạn. App tính mỗi tháng cần bỏ bao nhiêu. Mỗi lần để dành được thì bấm **Bỏ thêm**.',
+      a: 'Màn chính → thẻ **Mục tiêu** → **Thêm mục tiêu**: tên, số tiền cần, hạn. App tính mỗi tháng cần bỏ bao nhiêu. Mỗi lần để dành được thì bấm **Bỏ thêm**.\n\n' +
+        'Tiền đã để dành từ trước thì bật **Tiền có từ trước**: vẫn cộng vào mục tiêu nhưng không tính là tiết kiệm của tháng này. Lỡ ghi rồi: **Sửa** mục tiêu → bật **Có từ trước** ở dòng đó.',
     },
 
     migrate: {
@@ -994,7 +1145,8 @@ export const L = {
 
     edit: {
       q: 'Sửa hoặc xoá khoản đã ghi',
-      a: 'Vào **Sổ chi**, chạm vào khoản cần sửa → sửa rồi **Lưu**, hoặc bấm **Xóa**. Nhập lố tay? Cứ chạm vào sửa lại.',
+      a: 'Vào **Sổ chi**, chạm vào khoản cần sửa → sửa rồi **Lưu**, hoặc bấm **Xóa**. Nhập lố tay? Cứ chạm vào sửa lại.\n\n' +
+        'Đơn bị huỷ: mở khoản đó → bật **Đã huỷ** → **Lưu**. Khoản vẫn nằm trong Sổ chi (gạch ngang) nhưng không tính vào ngân sách, ví, thẻ.',
     },
 
     split: {
@@ -1003,7 +1155,9 @@ export const L = {
         'Lúc ghi khoản chi, chọn cách chia ở hàng cuối: **Chia đều** (chia đều cho bạn và những người đi cùng), **Trả hộ** (người khác trả hết), **Tự nhập** (gõ số tiền từng người). ' +
         'Rồi chọn **Với ai?** — chọn được nhiều người; chưa có ai thì bấm **+ Người khác** gõ tên (Lan, Mẹ, Công ty…). ' +
         'App chỉ tính phần của bạn vào ngân sách, phần còn lại ghi là người đó nợ.\n\n' +
-        'Khi họ trả: tab **Chia tiền** (hoặc ô **… nợ** ở màn chính) → chọn người → chạm khoản → **Trả đủ**.\n\n' +
+        '**Tự nhập**: gõ phần từng người, hoặc gõ **Phần mình** để phần còn lại tự chia đều cho những người đi cùng.\n\n' +
+        'Khi họ trả: tab **Chia tiền** (hoặc ô **… nợ** ở màn chính) → chọn người → chạm khoản → **Trả đủ**. Trả một cục cho nhiều khoản: bấm **Nhận tiền**, app trừ vào khoản cũ nhất trước; trả dư thì phần dư vẫn vào ví.\n\n' +
+        'Nhập sai: **Lịch sử nhận tiền** → chạm lần nhận → **Xoá lần nhận này**.\n\n' +
         'Hay chia lệch (vd. 1:2, mỗi người trả gấp đôi bạn): bấm **+ Tỉ lệ riêng** ngay lúc ghi. Sửa tên / xoá người: **Cài đặt → Chia tiền**.',
     },
 
@@ -1040,14 +1194,15 @@ export const L = {
       q: 'Đặt ngân sách tháng',
       a:
         'Tab **Ngân sách** → **Lập mới** → nhập thu nhập và số tiền định tiêu cho từng mục (để trống mục nào không cần).\n\n' +
-        'Màn Tổng quan sẽ báo **Còn tiêu được** bao nhiêu. Chạm từng mục trong Ngân sách để sửa; khoản cố định (gửi gia đình, gym…) có nút **Ghi đã chi** cho nhanh.',
+        'Màn Tổng quan sẽ báo **Còn tiêu được** bao nhiêu. Chạm từng mục trong Ngân sách để sửa; khoản cố định (gửi gia đình, gym…) có nút **Ghi đã chi** cho nhanh.\n\n' +
+        'Ngân sách vượt lương thì bấm **Giảm ăn tiêu cho vừa**: app giảm đều các mục ăn tiêu, cho xem trước rồi mới lưu.',
     },
 
     card: {
       q: 'Thẻ tín dụng: kỳ sao kê, ngày trả, trả góp',
       a:
         'Đặt **ngày chốt** và **hạn trả** ở **Cài đặt → Tiền & ngày**. Ngày chốt chỉ dùng cho **sao kê thẻ**: khoản quẹt sau ngày chốt nằm ở kỳ trả sau (xem khoảng ngày dưới tên kỳ ở tab Thẻ). Ngân sách, sổ chi, báo cáo luôn tính theo **tháng dương lịch** (1 → 30/31).\n\n' +
-        'Tab **Thẻ** cho biết kỳ này phải trả bao nhiêu. Trả góp: tab **Thẻ → Trả góp → + Thêm**, nhập tiền gốc, số tháng, lãi — app tự tính mỗi kỳ.\n\n' +
+        'Tab **Thẻ** cho biết kỳ này phải trả bao nhiêu. Trả góp: lúc ghi khoản chi trên thẻ, bật công tắc **Trả góp** rồi chọn số kỳ — app tự tính mỗi tháng. Khoản đã ghi thì mở ra, bật **Chuyển thành trả góp** (nhập **Phí chuyển đổi** nếu ngân hàng tính). Lãi, phí: chạm vào khoản đó ở tab **Thẻ**.\n\n' +
         'Không dùng thẻ? Xoá thẻ ở **Cài đặt → Nguồn tiền**, phần thẻ sẽ tự ẩn.',
     },
 
@@ -1100,6 +1255,9 @@ export const L = {
     geminiNoPermission: 'API key không có quyền dùng Gemini API (kiểm tra project trong AI Studio).',
     geminiNoModel: 'Không tìm thấy mô hình "{model}". Sửa tên mô hình trong Cài đặt.',
     geminiQuota: 'Hết lượt miễn phí hôm nay hoặc gửi quá nhanh, thử lại sau nhé.',
+    geminiBusy: 'Máy chủ Gemini đang quá tải (đã tự đổi mô hình). Đợi 1–2 phút rồi hỏi lại nhé.',
+    geminiSlow: 'Gemini trả lời quá lâu (đã tự đổi mô hình). Kiểm tra mạng rồi hỏi lại nhé.',
+    geminiSwitching: 'Gemini bận, đang đổi mô hình…',
     geminiStatus: 'Gemini báo lỗi {status}: {message}',
     geminiOffline: 'Không gửi được yêu cầu tới Gemini (mất mạng, hoặc trình chặn quảng cáo/VPN đang chặn googleapis.com).',
     geminiOther: 'Lỗi khi gọi Gemini: {message}',
@@ -1109,7 +1267,7 @@ export const L = {
     pingEmpty: 'Gemini có trả lời nhưng rỗng.',
     pingBadKey: 'Key không đúng — copy lại key trong AI Studio.',
     pingNoPermission: 'Key không có quyền dùng Gemini API (kiểm tra project của key trong AI Studio).',
-    pingNoModel: 'Không có mô hình "{model}" — thử để trống ô Mô hình hoặc gõ gemini-2.5-flash.',
+    pingNoModel: 'Không có mô hình "{model}" — chọn 3.8 Flash hoặc 3.5 Flash-Lite trong ô Mô hình.',
     pingQuota: 'Key đúng nhưng đã hết lượt miễn phí lúc này, thử lại sau.',
     pingStatus: 'Gemini báo lỗi {status}: {message}',
     pingOffline: 'Không gửi được yêu cầu: mất mạng, hoặc trình chặn quảng cáo / VPN / DNS chặn generativelanguage.googleapis.com.',
@@ -1198,6 +1356,16 @@ export const L = {
 
   /* ============ VÍ CỦA BẠN: SỐ DƯ, TỔNG TÀI SẢN (màn chính) ============ */
   wallet: {
+    // Sổ chi tiết từng ví (bấm vào 1 ví ở ô Tài sản)
+    paidBack: 'trả lại',
+    paidBackLater: 'trả lại thêm',
+    ledgerStart: 'Số dư nhập {date}',
+    ledgerStartOld: 'Số dư ban đầu',
+    ledgerNow: 'Hiện có',
+    // Một lần người khác chuyển trả nhiều khoản: gộp 1 dòng, chạm mở ra
+    receiptGroup: '{name} trả lại · {n} khoản',
+    ledgerEmpty: 'Chưa có khoản nào sau ngày nhập số dư.',
+    staleAnchor: 'Số dư {names} nhập bằng bản cũ, có thể thiếu tiền bạn bè đã trả lại. Chạm để nhập lại số dư thật.',
     title: 'Ví của bạn',
     // Khi chưa nhập số dư nguồn nào
     emptyText: 'Nhập số dư từng ví / tài khoản để biết mình đang có bao nhiêu.',
@@ -1210,7 +1378,7 @@ export const L = {
     transfer: 'Chuyển tiền',
     // Bảng nhập số dư
     sheetTitle: 'Số dư hiện tại',
-    sheetHint: 'Nhập số tiền đang có trong từng nguồn lúc này. Sau đó app tự cộng trừ theo các khoản bạn ghi.',
+    sheetHint: 'Nhập số đang có, app tự cộng trừ tiếp.',
     balanceLabel: 'Đang có',
     debtLabel: 'Đang nợ',
     leaveEmpty: 'Để trống nếu không muốn theo dõi nguồn này',
@@ -1311,7 +1479,7 @@ export const L = {
     tileEmpty: 'Đặt mục tiêu',
     tileEmptySub: 'Du lịch, mua máy…',
     tileSub: '{pct}% · {name}',
-    empty: 'Để dành cho chuyến đi, cái điện thoại mới… Đặt số tiền và hạn, app tính giúp mỗi tháng cần bỏ bao nhiêu.',
+    empty: 'Đặt số tiền và hạn, app tính mỗi tháng cần bỏ bao nhiêu.',
     add: 'Thêm mục tiêu',
     monthly: 'Mỗi tháng bỏ {amount} để kịp {date}',
     noDeadline: 'Còn thiếu {amount}',
@@ -1335,7 +1503,13 @@ export const L = {
     depositTitle: 'Bỏ thêm vào "{name}"',
     withdrawTitle: 'Rút ra từ "{name}"',
     amount: 'Số tiền',
-    depositHint: 'Chỉ ghi vào mục tiêu, không trừ số dư ví. Muốn trừ ví thì ghi thêm một khoản Chuyển sang tài khoản tiết kiệm.',
+    depositHint: 'Chỉ ghi vào mục tiêu, không trừ ví.',
+    // Tiền đã để dành từ trước: không tính là tiết kiệm của tháng nào
+    opening: 'Tiền có từ trước',
+    openingHint: 'Không tính vào tiết kiệm tháng này',
+    openingShort: 'Có từ trước',
+    history: 'Các lần bỏ tiền',
+    historyDelete: 'Xoá',
   },
 
   /* ============ VAY / CHO VAY (màn Chia tiền) ============ */
@@ -1385,7 +1559,7 @@ export const L = {
     wrongPin: 'Sai mã, thử lại',
     useBio: 'Dùng vân tay / Face ID',
     enable: 'Khoá app',
-    enableSub: 'Mở app, hoặc quay lại sau 1 phút, thì phải mở khoá',
+    enableSub: 'Hỏi mã khi mở app',
     setPin: 'Đặt mã PIN (4–6 số)',
     confirmPin: 'Nhập lại mã PIN',
     pinMismatch: 'Hai mã không giống nhau',
@@ -1412,7 +1586,7 @@ export const L = {
     permOn: 'Đã cho phép thông báo',
     permDenied: 'Thông báo đang bị chặn. Vào cài đặt điện thoại / trình duyệt → Ví Gọn → cho phép Thông báo.',
     permUnsupported: 'Trình duyệt này không gửi thông báo được. Bạn vẫn thấy lời nhắc ngay trong app.',
-    iosHint: 'iPhone: phải **Thêm vào MH chính** (nút Chia sẻ → Thêm vào MH chính) rồi mở app từ biểu tượng đó mới bật được thông báo.',
+    iosHint: 'iPhone: **Chia sẻ → Thêm vào MH chính**, mở app từ đó rồi bật.',
     daily: 'Nhắc ghi chi tiêu',
     dailySub: 'Hôm nào chưa ghi khoản nào thì nhắc',
     dailyAt: 'Lúc',
@@ -1424,13 +1598,17 @@ export const L = {
     budgetSub: 'Khi một danh mục đã tiêu tới',
     test: 'Thử thông báo',
     howTitle: 'Khi nào thì nhắc?',
-    how: 'Mở app là app kiểm tra và nhắc ngay. Lúc app đang đóng: **Android** đã cài app ra màn hình chính thì vẫn nhắc, nhưng giờ có thể lệch vì máy tự chọn lúc chạy ngầm. **iPhone** chỉ nhắc khi mở app.',
+    how: '**Android** (đã cài app): nhắc cả khi đóng app, giờ có thể lệch chút. **iPhone**: chỉ nhắc khi mở app.',
     // Nội dung thông báo
     dailyTitle: 'Hôm nay tiêu gì chưa ghi? ✍️',
     dailyBody: 'Bấm để ghi nhanh, 5 giây thôi.',
     cardTitle: 'Sắp tới hạn trả thẻ',
     cardBody: 'Còn {n} ngày (hạn {date}) · cần trả {amount}',
     cardToday: 'Hôm nay là hạn trả thẻ · cần trả {amount}',
+    owedTitle: 'Nhắc đòi tiền',
+    owedBody: 'Nhắc {name} trả {amount} trước {date} (còn {n} ngày)',
+    owedLateTitle: 'Trễ hẹn trả tiền',
+    owedLateBody: '{name} hẹn trả {amount} ngày {date} mà chưa trả · hẹn lại ngày mới',
     budgetTitle: 'Sắp lố ngân sách',
     budgetBody: '{name} đã tiêu {pct}% ({spent} / {limit})',
     budgetOverTitle: 'Lố ngân sách rồi',
@@ -1447,7 +1625,7 @@ export const L = {
     title: 'Nhập từ app khác',
     hint: 'Chuyển lịch sử từ Money Lover, Misa Sổ Thu Chi, hoặc file Excel / CSV sao kê ngân hàng.',
     pick: 'Chọn file',
-    how: 'Money Lover: Cài đặt → Xuất dữ liệu (CSV / Excel). Misa: Báo cáo → Xuất Excel. Chưa rõ thì cứ chọn file, app tự dò cột.',
+    how: 'Money Lover: Cài đặt → Xuất dữ liệu. Misa: Báo cáo → Xuất Excel.',
     readFail: 'Không đọc được file này. Thử xuất lại dạng .csv hoặc .xlsx.',
     sheetTitle: 'Nhập từ file',
     colsTitle: 'Cột trong file',
@@ -1486,8 +1664,10 @@ export const L = {
   reconcile: {
     button: 'Đối chiếu sao kê',
     title: 'Đối chiếu sao kê',
-    hint: 'Chọn file sao kê PDF (hoặc ảnh chụp) của thẻ này. App so với các khoản bạn đã ghi và chỉ ra chỗ thiếu, chỗ trùng.',
+    hint: 'So sao kê với các khoản đã ghi: chỉ ra khoản thiếu, khoản trùng.',
     pick: 'Chọn file sao kê',
+    gmail: 'Quét email ngân hàng ({range})',
+    noEmails: 'Không thấy email ngân hàng nào trong kỳ này.',
     reading: 'Đang đọc sao kê…',
     needAi: 'Sao kê dạng ảnh cần AI để đọc. Vào Cài đặt → AI nhập tự động để nhập key.',
     nothing: 'Không đọc được dòng giao dịch nào trong file này.',
@@ -1503,7 +1683,7 @@ export const L = {
     fixAmount: 'Sửa thành {amount}',
     fixed: 'Đã sửa',
     extraTitle: 'Có trong app, không có trên sao kê ({n})',
-    extraHint: 'Có thể ghi trùng, ghi nhầm thẻ, hoặc ngân hàng chưa ghi nhận. Chạm để sửa / xoá.',
+    extraHint: 'Có thể ghi trùng hoặc nhầm thẻ.',
     dup: 'nghi ghi trùng',
     again: 'Chọn file khác',
   },
@@ -1533,7 +1713,7 @@ export const L = {
     flexible: 'Còn chi linh hoạt',
     byHabit: 'Chia cho các mục theo thói quen chi các tháng trước.',
     even: 'Chưa có lịch sử chi nên chia đều cho các mục.',
-    short: 'Tiền thu không đủ cho cố định + trả góp + để dành. Giảm % để dành hoặc xem lại khoản cố định.',
+    short: 'Thu không đủ. Giảm % để dành hoặc khoản cố định.',
     apply: 'Điền vào ngân sách',
     applied: 'Đã điền. Sửa lại từng mục tùy ý rồi bấm Lưu.',
   },
@@ -1573,9 +1753,45 @@ export const L = {
     card: 'Hạn trả thẻ',
     weekdays: 'T2,T3,T4,T5,T6,T7,CN',
     listTitle: 'Trong tháng',
-    empty: 'Tháng này chưa có mốc nào. Thêm khoản định kỳ (tiền nhà, Netflix…) để thấy ở đây.',
+    empty: 'Tháng này chưa có mốc nào.',
+    fixedLeft: 'Khoản cố định còn lại',
     today: 'Hôm nay',
     totalOut: 'Phải chi',
     totalIn: 'Sẽ nhận',
+  },
+
+  /* ============ CÓ GÌ MỚI ============ */
+  /* Mỗi lần có tính năng mới: thêm 1 đợt lên ĐẦU `releases` (chỉ tên, 1 dòng),
+   * và 1 câu trong `tips` — app khoanh sáng đúng nút đó lần đầu người dùng tới màn ấy. */
+  news: {
+    title: 'Có gì mới',
+    gotIt: 'Hiểu rồi',
+    releases: [
+      {
+        date: '2026-11-16',
+        items: [
+          'Chia tiền: nhập được phần mình',
+          'Nhận tiền một cục, trừ khoản cũ trước',
+          'Xoá lần nhận tiền nhập sai',
+          'Chuyển khoản đã ghi thành trả góp',
+          'Ngân sách lố: giảm cho vừa bằng 1 nút',
+          'Robot trợ lý tiền',
+          'Mục tiêu: tiền có từ trước không tính vào tháng',
+          'Đánh dấu giao dịch Đã huỷ',
+          'Lịch sử nhận tiền: 1 lần chuyển = 1 dòng',
+        ],
+      },
+    ],
+    tips: {
+      myPart: { title: 'Mới: nhập phần mình', text: 'Gõ phần mình, còn lại tự chia đều.' },
+      receive: { title: 'Mới: Nhận tiền', text: 'Nhận một cục, trừ khoản cũ trước.' },
+      history: { title: 'Mới: Lịch sử nhận tiền', text: 'Nhập sai thì vào đây xoá.' },
+      convert: { title: 'Mới: Chuyển thành trả góp', text: 'Đổi khoản đã ghi sang trả góp.' },
+      fit: { title: 'Mới: Giảm cho vừa', text: 'Bấm để app tự giảm cho vừa lương.' },
+      bot: { title: 'Mới: Robot trợ lý tiền', text: 'Hỏi gì về tiền cũng được.' },
+      receiptGroup: { title: 'Mới: 1 lần chuyển = 1 dòng', text: 'Chạm để xem lần chuyển này trả cho những khoản nào.' },
+      cancel: { title: 'Mới: Đã huỷ', text: 'Đơn bị huỷ thì bật: giữ lại để xem nhưng không tính tiền.' },
+      opening: { title: 'Mới: Tiền có từ trước', text: 'Bật nếu là tiền đã để dành từ trước, không tính vào tháng này.' },
+    },
   },
 };

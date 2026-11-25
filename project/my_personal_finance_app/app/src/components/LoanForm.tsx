@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { isTouch } from '../viewport';
 import { todayISO } from '../domain/calc';
 import { uid } from '../domain/format';
-import { peopleOf, personName, splitsOf } from '../domain/split';
+import { peopleOf, personName, received, setPaid as withPaid, splitsOf } from '../domain/split';
 import type { Transaction } from '../domain/types';
 import { useStore } from '../store';
 import { MoneyInput, Sheet } from './ui';
@@ -19,7 +19,7 @@ export function LoanForm({ tx, initialKind = 'lend', onClose }: { tx?: Transacti
   const people = peopleOf(data.settings);
   const [who, setWho] = useState(part?.person ?? '');
   const [amount, setAmount] = useState(tx?.amount ?? 0);
-  const [paid, setPaid] = useState(part?.paid ?? 0);
+  const [paid, setPaid] = useState(part ? received(part) : 0);
   const [accountId, setAccountId] = useState(tx?.accountId ?? data.accounts.find((a) => a.kind !== 'credit')?.id ?? data.accounts[0]?.id ?? '');
   const [date, setDate] = useState(tx?.date ?? todayISO());
   const [note, setNote] = useState(tx && tx.merchant !== autoName(tx.kind, personName(data.settings, part?.person)) ? tx.merchant : '');
@@ -36,7 +36,7 @@ export function LoanForm({ tx, initialKind = 'lend', onClose }: { tx?: Transacti
   }
 
   return (
-    <Sheet title={tx ? (kind === 'lend' ? T.editLend : T.editBorrow) : kind === 'lend' ? T.lend : T.borrow} onClose={onClose}>
+    <Sheet title={tx ? (kind === 'lend' ? T.editLend : T.editBorrow) : kind === 'lend' ? T.lend : T.borrow} info={T.hint} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
@@ -50,7 +50,8 @@ export function LoanForm({ tx, initialKind = 'lend', onClose }: { tx?: Transacti
             myShare: 0,
             categoryId: kind,
             accountId,
-            splits: [{ person: who, amount, paid: Math.min(paid, amount) }],
+            // Giữ lịch sử trả của người cũ; số "đã trả" đổi thì ghi phần chênh vào hôm nay.
+            splits: [withPaid({ person: who, amount, paid: part?.person === who ? part.paid : 0, log: part?.person === who ? part.log : undefined }, paid, todayISO())],
             reimbursed: 0,
             kind,
           };
@@ -109,7 +110,6 @@ export function LoanForm({ tx, initialKind = 'lend', onClose }: { tx?: Transacti
             <MoneyInput value={paid} onChange={setPaid} />
           </label>
         )}
-        <p className="hint">{T.hint}</p>
         <button className="btn btn--primary btn--block" type="submit" disabled={!valid}>
           {T.save}
         </button>

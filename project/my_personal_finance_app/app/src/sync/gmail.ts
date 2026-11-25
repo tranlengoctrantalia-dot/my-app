@@ -59,6 +59,13 @@ export function buildQuery(l: GmailLimits, lastRead?: string): string {
   return `${time} -category:promotions (${SUBJECTS.map((s) => `subject:"${s}"`).join(' OR ')} OR from:(${all}))`;
 }
 
+/** Email ngân hàng trong khoảng ngày (vd. một kỳ sao kê; sao kê thường gửi sau ngày chốt nên lấy tới hạn trả). */
+export function bankQuery(from: string, to: string): string {
+  const next = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10);
+  const all = BANKS.flatMap((b) => b.domains).join(' OR ');
+  return `after:${from.replaceAll('-', '/')} before:${next.replaceAll('-', '/')} -category:promotions (${SUBJECTS.map((s) => `subject:"${s}"`).join(' OR ')} OR from:(${all}))`;
+}
+
 /** Bộ lọc mặc định (30 ngày, mọi ngân hàng). */
 export const DEFAULT_QUERY = buildQuery(DEFAULT_LIMITS);
 

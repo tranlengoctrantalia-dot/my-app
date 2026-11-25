@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { dm, money } from '../domain/format';
 import type { ColKey, Sheet as DataSheet } from '../domain/importer';
 import { useStore } from '../store';
-import { Card, Sheet } from './ui';
+import { Card, Sheet, Info } from './ui';
 import { Icon } from './icons';
 import { L } from '../labels';
 import { Rich, t } from '../i18n';
@@ -33,12 +33,10 @@ export function MigrateCard() {
   }
 
   return (
-    <Card title={M.title}>
-      <p className="hint">{M.hint}</p>
+    <Card title={M.title} info={`${M.hint} ${M.how}`}>
       <button className="btn btn--block add-btn" disabled={busy} onClick={() => file.current?.click()}>
         <Icon name="upload_file" size={20} /> {busy ? L.common.loading : M.pick}
       </button>
-      <p className="hint">{M.how}</p>
       <input
         ref={file}
         type="file"
@@ -70,8 +68,10 @@ function MigrateSheet({ lib, sheet, onClose }: { lib: Importer; sheet: DataSheet
     <Sheet title={M.sheetTitle} onClose={onClose}>
       <div className="form">
         <div className="field">
-          <span>{M.colsTitle}</span>
-          <p className="hint">{M.colsHint}</p>
+          <span>
+            {M.colsTitle}
+            <Info>{M.colsHint}</Info>
+          </span>
           <div className="map-grid">
             {COLS.map((k) => (
               <label key={k} className="field">

@@ -1,19 +1,21 @@
 import { useState, type ReactNode } from 'react';
 import { isTouch } from '../viewport';
-import { todayISO } from '../domain/calc';
-import { dayLabel, money, uid } from '../domain/format';
+import { cardSettings, installmentPayment, INSTALLMENT_TERMS, periodOf, shiftPeriod, todayISO } from '../domain/calc';
+import { dayLabel, money, periodLabel, uid } from '../domain/format';
 import type { Transaction, TxSplit } from '../domain/types';
-import { BUILTIN, CUSTOM, customRatios, findPreset, inferSplit, peopleOf, personName, presetLabel, splitByRatio, splitsOf } from '../domain/split';
+import { BUILTIN, CUSTOM, customRatios, findPreset, inferSplit, peopleOf, personName, presetLabel, received, setPaid, splitByRatio, splitsOf } from '../domain/split';
 import { useStore } from '../store';
-import { MoneyInput, Sheet } from './ui';
-import { Icon, catColor, catIcon } from './icons';
+import { Info, MoneyInput, Sheet } from './ui';
+import { Art, Icon, catColor, catIcon } from './icons';
 import { AccountForm, CategoryForm } from './Manage';
 import { SplitPresetForm } from '../screens/Settings';
-import { Tour, type TourStep } from './Tour';
+import { Tour, tourSeen, type TourStep } from './Tour';
+import { NewTip } from './WhatsNew';
 import { L } from '../labels';
 import { fold } from '../ai/redact';
-import { CARD_PAY } from '../domain/insights';
+import { CARD_PAY, INSTALLMENT, installmentMatch } from '../domain/insights';
 import { Rich, t } from '../i18n';
+import { budgetImpact, budgetRoom } from '../domain/coach';
 
 const T = L.txForm;
 const formTour: TourStep[] = [
@@ -42,6 +44,23 @@ function Section({ label, action, children }: { label: string; action?: ReactNod
 }
 
 
+/** Ví / thẻ dùng ở khoản ghi gần nhất: khoản mới chọn sẵn ví này. */
+const LAST_ACCOUNT = 'vi-cua-nang/last-account';
+function lastAccount() {
+  try {
+    return localStorage.getItem(LAST_ACCOUNT);
+  } catch {
+    return null;
+  }
+}
+function rememberAccount(id: string) {
+  try {
+    localStorage.setItem(LAST_ACCOUNT, id);
+  } catch {
+    /* bỏ qua */
+  }
+}
+
 export function TxForm({
   tx,
   draft,
@@ -50,15 +69,18 @@ export function TxForm({
   onSave,
   onLoan,
   initialKind,
+  initialInstallment,
   fill,
 }: {
   /** Điền sẵn khi mở từ nút "Ghi đã trả thẻ". */
-  fill?: { amount: number; merchant: string; toAccountId?: string };
+  fill?: { amount: number; merchant: string; toAccountId?: string; source?: string };
   /** Mở bảng cho vay / đi vay thay cho bảng này. */
   onLoan?: () => void;
   tx?: Transaction;
   /** Mở sẵn ở loại này (vd. "Chuyển tiền" từ thẻ Ví của bạn). */
   initialKind?: Kind;
+  /** Mở sẵn công tắc Trả góp với thẻ này (nút Thêm ở tab Thẻ). */
+  initialInstallment?: string;
   /** Đang sửa khoản AI vừa đọc (chưa lưu vào sổ): không có nút Xóa, lưu thì trả về qua onSave. */
   draft?: boolean;
   onClose: () => void;
@@ -74,7 +96,15 @@ export function TxForm({
   const income = kind === 'income';
   const refund = kind === 'refund';
   const transfer = kind === 'transfer';
-  const cats = data.categories.filter((c) => (income ? c.kind === 'income' : c.kind === 'spend' || c.kind === 'fixed'));
+  // Danh mục hay dùng lên đầu (đếm lúc mở form, để nút không nhảy chỗ khi đang chọn).
+  const [uses] = useState(() => {
+    const m = new Map<string, number>();
+    for (const x of data.transactions) m.set(x.categoryId, (m.get(x.categoryId) ?? 0) + 1);
+    return m;
+  });
+  const cats = data.categories
+    .filter((c) => (income ? c.kind === 'income' : c.kind === 'spend' || c.kind === 'fixed'))
+    .sort((a, b) => (uses.get(b.id) ?? 0) - (uses.get(a.id) ?? 0));
   const [adding, setAdding] = useState<'category' | 'account' | 'split' | null>(null);
 
   const [amount, setAmount] = useState(tx ? Math.abs(tx.amount) : (fill?.amount ?? 0));
@@ -85,7 +115,11 @@ export function TxForm({
   );
   const [date, setDate] = useState(tx?.date ?? today);
   const [accountId, setAccountId] = useState(
-    tx?.accountId ?? (initialKind === 'transfer' ? data.accounts.find((a) => a.kind === 'bank') : undefined)?.id ?? data.accounts[0]?.id ?? '',
+    tx?.accountId ??
+      initialInstallment ??
+      (initialKind === 'transfer' ? data.accounts.find((a) => a.kind === 'bank') : data.accounts.find((a) => a.id === lastAccount()))?.id ??
+      data.accounts[0]?.id ??
+      '',
   );
   const [toAccountId, setToAccountId] = useState(
     tx?.toAccountId ?? fill?.toAccountId ?? (data.accounts.find((a) => a.kind === 'credit') ?? data.accounts.find((a) => a.id !== accountId))?.id ?? '',
@@ -93,8 +127,6 @@ export function TxForm({
   // Lặp lại hàng tháng: chỉ khi thêm khoản chi / thu mới.
   const [repeat, setRepeat] = useState(false);
   const canRepeat = !tx && !draft && (kind === 'expense' || income);
-  // Đóng trước cho mấy tháng (chỉ khoản chi): ngân sách chia đều.
-  const [spread, setSpread] = useState(tx?.spreadMonths ?? 1);
   // Cách chia + chia với những ai (nhiều người được).
   const initSplit = tx ? inferSplit(tx, data.settings) : undefined;
   const [mode, setModeState] = useState<string>(initSplit?.mode ?? 'me');
@@ -109,6 +141,7 @@ export function TxForm({
     setChosenState((xs) => (xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id]));
     setWhoTouched(true);
   };
+  const [cancelled, setCancelled] = useState(!!tx?.cancelled);
   const [customAmounts, setCustomAmounts] = useState<Record<string, number>>(initSplit?.amounts ?? {});
   const [newPerson, setNewPerson] = useState<string | null>(null);
   const setMode = (m: string) => {
@@ -134,8 +167,20 @@ export function TxForm({
   const plain = refund || income || transfer;
   const preset = findPreset(data.settings, mode);
   // Có phần của người khác (chia đều, tỉ lệ, trả hộ, tự nhập…) thì phải chọn chia với ai.
-  const needsPerson = !plain && mode !== 'me' && (mode === CUSTOM || (preset?.other ?? 0) > 0);
-  const prevPaid = (person: string) => (tx ? (splitsOf(tx).find((x) => x.person === person)?.paid ?? 0) : 0);
+  const splitOn = !plain && mode !== 'me' && (mode === CUSTOM || (preset?.other ?? 0) > 0);
+  // Trả góp: công tắc luôn hiện với khoản chi; không quẹt thẻ thì mờ đi kèm lý do. Có chia tiền vẫn được (giữ phần người khác nợ).
+  const isCard = data.accounts.find((a) => a.id === accountId)?.kind === 'credit';
+  const canInst = kind === 'expense' && !draft && !fill && (!tx || (!tx.kind && !tx.installmentId));
+  const instBlock = !isCard ? T.instNeedCard : undefined;
+  const [instOn, setInstOn] = useState(!!initialInstallment);
+  const [term, setTerm] = useState(0);
+  const [fee, setFee] = useState(0);
+  const inst = canInst && !instBlock && instOn;
+  const instMonthly = installmentPayment(amount, term);
+  const firstPeriod = periodOf(date, cardSettings(data, accountId).cutoffDay);
+  const room = budgetRoom(data, firstPeriod);
+  const needsPerson = splitOn;
+  const prevPart = (person: string) => (tx ? splitsOf(tx).find((x) => x.person === person) : undefined);
   const result: { myShare: number; splits: TxSplit[] } = !needsPerson
     ? { myShare: amount, splits: [] }
     : mode === CUSTOM
@@ -144,14 +189,35 @@ export function TxForm({
           return { myShare: amount - splits.reduce((a, x) => a + x.amount, 0), splits };
         })()
       : splitByRatio(amount, preset!.mine, preset!.other, chosen);
-  // Giữ lại số tiền người đó đã trả (khi sửa khoản cũ).
-  const splits = result.splits.filter((x) => x.amount > 0).map((x) => ({ ...x, paid: Math.min(prevPaid(x.person), x.amount) }));
+  // Giữ lại số tiền người đó đã trả + lịch sử trả (khi sửa khoản cũ); phần mới nhỏ hơn số đã trả thì ghi bớt vào hôm nay.
+  const splits = result.splits
+    .filter((x) => x.amount > 0)
+    .map((x) => {
+      const prev = prevPart(x.person);
+      return prev ? setPaid({ ...x, paid: prev.paid, log: prev.log }, received(prev), todayISO()) : x;
+    });
   const myShare = result.myShare;
+  /** "Tự nhập": gõ phần mình → phần còn lại chia đều cho những người đang chọn, tiền lẻ dồn vào người đầu. */
+  const setMyPart = (mine: number) => {
+    if (!chosen.length) return;
+    const rest = Math.max(0, amount - Math.min(Math.max(0, mine), amount));
+    const each = Math.floor(rest / chosen.length);
+    setCustomAmounts((x) => ({ ...x, ...Object.fromEntries(chosen.map((id, i) => [id, each + (i === 0 ? rest - each * chosen.length : 0)])) }));
+  };
+  // Ngân sách chỉ trừ phần mình của mỗi kỳ góp (khoản có chia tiền).
+  const instMine = amount > 0 ? Math.round((instMonthly * myShare) / amount) : instMonthly;
+  const roomAfter = room.income > 0 ? room.room - instMine : undefined;
+  // Cố vấn theo Ngân sách: danh mục còn bao nhiêu, chi linh hoạt cả tháng còn bao nhiêu sau khoản này.
+  const effect = kind === 'expense' && !inst && amount > 0 && categoryId ? budgetImpact(data, categoryId, myShare, date, tx) : undefined;
+  const effectNeg = (effect?.catLeft ?? 0) < 0 || (effect?.flexLeft ?? 0) < 0;
   const nameOf = (id: string) => personName(data.settings, id);
   const oneName = chosen.length === 1 ? nameOf(chosen[0]) : undefined;
   const valid = transfer
     ? amount > 0 && !!toAccountId && toAccountId !== accountId
-    : amount > 0 && cats.some((c) => c.id === categoryId) && (!needsPerson || (chosen.length > 0 && myShare >= 0));
+    : amount > 0 && cats.some((c) => c.id === categoryId) && (!inst || term > 0) && (!needsPerson || (chosen.length > 0 && myShare >= 0));
+  // Ghi tay trùng khoản trả góp đang chạy, hoặc ghi chú có chữ "trả góp" mà chưa bật công tắc.
+  const dup = kind === 'expense' && !inst && amount > 0 ? installmentMatch(data, merchant, amount, date) : undefined;
+  const looksInst = !dup && canInst && !instBlock && !inst && INSTALLMENT.test(fold(merchant));
 
   function addPerson(name: string) {
     const n = name.trim();
@@ -189,6 +255,28 @@ export function TxForm({
     if (from && data.accounts.find((a) => a.id === accountId)?.kind !== 'bank') setAccountId(from.id);
   }
 
+  /**
+   * Tạo khoản trả góp: app tự cộng vào sao kê (đủ tiền) và ngân sách (phần mình) mỗi tháng tới hết kỳ.
+   * Không chia tiền: bỏ giao dịch gốc để không tính 2 lần. Có chia tiền: giữ giao dịch gốc, gắn nhãn đã chuyển
+   * trả góp (không tính chi tiêu / sao kê nữa), chỉ để theo dõi người khác còn nợ.
+   */
+  function saveInstallment(base: Transaction) {
+    const cat = cats.find((c) => c.id === categoryId);
+    const name = merchant.trim() || cat?.name || '';
+    const id = uid();
+    const newCat = { id: `inst-${id}`, name: t(L.card.categoryName, { name }), icon: '', kind: 'installment' as const, iconName: cat && catIcon(cat.id, cat), color: cat && catColor(cat.id, cat) };
+    const shared = splits.length > 0 && amount > 0;
+    dispatch({
+      type: 'upsertInstallment',
+      item: { id, name, monthly: instMonthly, firstPeriod, months: term, accountId, categoryId: newCat.id, principal: amount, fee: fee || undefined, share: shared ? myShare / amount : undefined },
+      category: newCat,
+    });
+    if (shared) dispatch({ type: 'upsertTx', tx: { ...base, installmentId: id } });
+    else if (tx) dispatch({ type: 'deleteTx', id: tx.id });
+    rememberAccount(accountId);
+    onClose();
+  }
+
   function save() {
     if (!valid) return;
     if (transfer) {
@@ -204,7 +292,8 @@ export function TxForm({
         reimbursed: 0,
         note: tx?.note,
         kind: 'transfer',
-        source: tx?.source,
+        // Trả thẻ từ nút "Ghi đã trả thẻ": nhớ là trả cho kỳ nào (đổi thẻ nhận thì bỏ).
+        source: tx?.source ?? (fill?.source && toAccountId === fill.toAccountId ? fill.source : undefined),
       };
       if (onSave) onSave(next);
       else dispatch({ type: 'upsertTx', tx: next });
@@ -212,7 +301,7 @@ export function TxForm({
       return;
     }
     const sign = refund ? -1 : 1;
-    const recurringId = canRepeat && repeat ? uid() : undefined;
+    const recurringId = canRepeat && repeat && !inst ? uid() : undefined;
     const next: Transaction = {
       id: tx?.id ?? uid(),
       date,
@@ -226,11 +315,25 @@ export function TxForm({
       reimbursed: 0,
       note: tx?.note,
       kind: income ? 'income' : undefined,
-      spreadMonths: kind === 'expense' && spread > 1 ? spread : undefined,
+      // Giữ cách chia nhiều tháng của khoản cũ (đã bỏ nút chọn).
+      spreadMonths: kind === 'expense' ? tx?.spreadMonths : undefined,
       source: recurringId ? `recurring:${recurringId}:${date}` : tx?.source,
+      // Sửa khoản đã chuyển trả góp: vẫn giữ là trả góp.
+      installmentId: tx?.installmentId,
+      cancelled: tx && cancelled ? true : undefined,
     };
+    if (inst) return saveInstallment(next);
     if (onSave) onSave(next);
     else dispatch({ type: 'upsertTx', tx: next });
+    // Vừa huỷ khoản mua mà đã có khoản hoàn cùng số tiền, cùng nguồn: huỷ luôn khoản hoàn, kẻo bị trừ tiền 2 lần.
+    if (next.cancelled && !tx?.cancelled && next.amount > 0) {
+      const back = data.transactions.find(
+        (x) => !x.cancelled && !x.kind && x.accountId === next.accountId && x.amount === -next.amount && x.date >= next.date,
+      );
+      if (back && confirm(t(T.cancelRefundConfirm, { amount: money(next.amount), date: `${back.date.slice(8, 10)}/${back.date.slice(5, 7)}` })))
+        dispatch({ type: 'upsertTx', tx: { ...back, cancelled: true } });
+    }
+    if (!tx) rememberAccount(accountId);
     if (recurringId) {
       // Khoản này là lần đầu; các tháng sau app tự ghi vào cùng ngày.
       dispatch({
@@ -266,7 +369,11 @@ export function TxForm({
   };
 
   return (
-    <Sheet title={tx ? T.titleEdit : transfer ? T.titleTransfer : income ? T.titleIncome : refund ? T.titleRefund : T.titleExpense} onClose={onClose}>
+    <Sheet
+      title={tx ? T.titleEdit : transfer ? T.titleTransfer : income ? T.titleIncome : refund ? T.titleRefund : T.titleExpense}
+      info={refund ? T.refundHint : transfer ? T.transferHint : undefined}
+      onClose={onClose}
+    >
       <form
         className="form"
         onSubmit={(e) => {
@@ -296,8 +403,6 @@ export function TxForm({
             </button>
           )}
         </div>
-        {refund && <p className="hint">{T.refundHint}</p>}
-        {transfer && <p className="hint">{T.transferHint}</p>}
         {transfer && !tx && onLoan && (
           <button type="button" className="link" onClick={onLoan}>
             {L.loan.fromTransfer}
@@ -307,6 +412,89 @@ export function TxForm({
         <div className={`amount-xl ${plain ? 'amount-xl--refund' : ''}`}>
           <MoneyInput value={amount} onChange={setAmount} autoFocus={!tx && !isTouch} placeholder={T.amountPlaceholder} aria-label={T.amountAria} />
         </div>
+
+        {effect && (effect.catLeft !== undefined || effect.flexLeft !== undefined) && (
+          <p className={`hint advice-hint ${effectNeg ? 'neg' : ''}`}>
+            {[
+              effect.catLeft !== undefined &&
+                t(effect.catLeft < 0 ? L.coach.txCatOver : L.coach.txCatLeft, { name: cats.find((c) => c.id === categoryId)?.name ?? '', amount: money(Math.abs(effect.catLeft)) }),
+              effect.flexLeft !== undefined &&
+                t(effect.flexLeft < 0 ? L.coach.txFlexOver : L.coach.txFlexLeft, { m: Number(effect.month.slice(5, 7)), amount: money(Math.abs(effect.flexLeft)) }),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        )}
+
+        {/* Ngày + ví ngay dưới số tiền: chỗ hay chọn nhầm nhất, phải thấy liền. */}
+        <div className="tx-pair">
+          <Section label={T.dateLabel}>
+            <label className="opt opt--field">
+              <Icon name="calendar" size={16} />
+              {dayLabel(date, today)}
+              <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label={T.dateAria} />
+            </label>
+          </Section>
+          <Section label={transfer ? T.fromLabel : income ? T.accountLabelIncome : refund ? T.accountLabelRefund : T.accountLabelExpense}>
+            <label className="opt opt--field">
+              <Icon name="card" size={16} />
+              <select
+                value={accountId}
+                onChange={(e) => (e.target.value === '__new' ? setAdding('account') : setAccountId(e.target.value))}
+                aria-label={T.accountAria}
+              >
+                {data.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+                <option value="__new">{T.addAccount}</option>
+              </select>
+            </label>
+          </Section>
+        </div>
+
+        {canInst && (
+          <label className={`switch-row ${instBlock ? 'switch-row--off' : ''}`} data-tour="convert">
+            <span>
+              {tx ? T.instConvert : T.instLabel}
+              {instBlock && <Info>{instBlock}</Info>}
+            </span>
+            <input type="checkbox" checked={inst} disabled={!!instBlock} onChange={(e) => setInstOn(e.target.checked)} />
+          </label>
+        )}
+        {inst && (
+          <Section label={T.instTerm}>
+            <div className="chips">
+              {INSTALLMENT_TERMS.map((n) => (
+                <button type="button" key={n} className="chip" aria-pressed={term === n} onClick={() => setTerm(n)}>
+                  {n}
+                </button>
+              ))}
+              <input
+                className="chip chip--input"
+                type="number"
+                min={1}
+                inputMode="numeric"
+                placeholder={L.card.termOther}
+                value={INSTALLMENT_TERMS.includes(term) || !term ? '' : term}
+                onChange={(e) => setTerm(Number(e.target.value) || 0)}
+                aria-label={L.card.termOtherAria}
+              />
+            </div>
+            <label className="field">
+              <span>{T.instFee}</span>
+              <MoneyInput value={fee} onChange={setFee} placeholder="0" />
+            </label>
+            {amount > 0 && term > 0 && (
+              <p className={`hint advice-hint ${roomAfter !== undefined && roomAfter < room.flexPlanned ? 'neg' : ''}`}>
+                {t(T.instResult, { monthly: money(instMonthly), period: periodLabel(shiftPeriod(firstPeriod, term - 1)) })}
+                {fee > 0 && ` · ${t(T.instFeeFirst, { amount: money(fee), period: periodLabel(firstPeriod) })}`}
+                {roomAfter !== undefined && roomAfter < room.flexPlanned && ` · ${t(T.instOver, { amount: money(room.flexPlanned - roomAfter) })}`}
+              </p>
+            )}
+          </Section>
+        )}
 
         {!transfer && (
           <Section label={refund ? T.categoryLabelRefund : T.categoryLabel}>
@@ -325,7 +513,7 @@ export function TxForm({
                   style={{ '--c': catColor(c.id, c) } as React.CSSProperties}
                 >
                   <span className="cat-grid__icon">
-                    <Icon name={catIcon(c.id, c)} size={20} />
+                    <Art name={catIcon(c.id, c)} size={32} />
                   </span>
                   {c.name}
                 </button>
@@ -358,39 +546,35 @@ export function TxForm({
               </button>
             </div>
           )}
+          {dup && (
+            <div className="banner banner--stack">
+              <span>{t(T.dupInst, { name: dup.name })}</span>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => {
+                  if (tx) dispatch({ type: 'deleteTx', id: tx.id });
+                  onClose();
+                }}
+              >
+                {T.dupInstDrop}
+              </button>
+            </div>
+          )}
+          {looksInst && (
+            <div className="banner banner--stack">
+              <span>{T.looksInst}</span>
+              <button type="button" className="btn btn--primary" onClick={() => setInstOn(true)}>
+                {T.looksInstOn}
+              </button>
+            </div>
+          )}
           <datalist id="merchants">
             {[...new Set(data.transactions.map((t) => t.merchant))].map((m) => (
               <option key={m} value={m} />
             ))}
           </datalist>
         </Section>
-
-        <div className="tx-pair">
-          <Section label={T.dateLabel}>
-            <label className="opt opt--field">
-              <Icon name="calendar" size={16} />
-              {dayLabel(date, today)}
-              <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label={T.dateAria} />
-            </label>
-          </Section>
-          <Section label={transfer ? T.fromLabel : income ? T.accountLabelIncome : refund ? T.accountLabelRefund : T.accountLabelExpense}>
-            <label className="opt opt--field">
-              <Icon name="card" size={16} />
-              <select
-                value={accountId}
-                onChange={(e) => (e.target.value === '__new' ? setAdding('account') : setAccountId(e.target.value))}
-                aria-label={T.accountAria}
-              >
-                {data.accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-                <option value="__new">{T.addAccount}</option>
-              </select>
-            </label>
-          </Section>
-        </div>
 
         {transfer && (
           <Section label={T.toLabel}>
@@ -473,51 +657,38 @@ export function TxForm({
                     <MoneyInput value={customAmounts[id] ?? 0} onChange={(n) => setCustomAmounts((x) => ({ ...x, [id]: n }))} />
                   </label>
                 ))}
-                <div className="share-row share-row--mine">
+                <label className="share-row share-row--mine">
                   <span>{T.myPart}</span>
-                  <b className={myShare < 0 ? 'neg' : ''}>{money(myShare)}</b>
-                </div>
+                  <MoneyInput className={myShare < 0 ? 'neg' : undefined} value={myShare} onChange={setMyPart} />
+                </label>
               </div>
             )}
             {splitHint() && <p className="hint">{splitHint()}</p>}
           </Section>
         )}
 
-        {kind === 'expense' && !repeat && (
-          <div className="field">
-            {/* Mặc định tắt: chỉ ai đóng trước (quỹ, học phí, bảo hiểm…) mới cần. */}
-            <label className="switch-row">
-              <span>
-                {T.spreadLabel}
-                <small>{spread > 1 && amount > 0 ? t(T.spreadHint, { n: spread, amount: money(Math.round(myShare / spread)) }) : T.spreadExample}</small>
-              </span>
-              <input type="checkbox" checked={spread > 1} onChange={(e) => setSpread(e.target.checked ? 2 : 1)} />
-            </label>
-            {spread > 1 && (
-              <div className="chips">
-                {[2, 3, 6, 12].map((n) => (
-                  <button type="button" key={n} className="chip" aria-pressed={spread === n} onClick={() => setSpread(n)}>
-                    {t(T.spreadN, { n })}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {canRepeat && (
+        {canRepeat && !inst && (
           <label className="switch-row">
             <span>
               {T.repeatLabel}
-              {repeat && <small>{t(T.repeatHint, { day: Number(date.slice(8, 10)) })}</small>}
+              <Info>{t(T.repeatHint, { day: Number(date.slice(8, 10)) })}</Info>
             </span>
             <input type="checkbox" checked={repeat} onChange={(e) => setRepeat(e.target.checked)} />
           </label>
         )}
 
         <button type="submit" className="btn btn--primary btn--block" disabled={!valid}>
-          {valid ? T.save : amount > 0 ? (transfer ? T.sameAccount : !cats.some((c) => c.id === categoryId) ? T.pickCategory : T.needPerson) : T.enterAmount}
+          {valid ? T.save : amount > 0 ? (transfer ? T.sameAccount : !cats.some((c) => c.id === categoryId) ? T.pickCategory : inst ? T.pickTerm : T.needPerson) : T.enterAmount}
         </button>
+        {tx && !draft && !transfer && !tx.kind && (
+          <label className="switch-row" data-tour="cancel">
+            <span>
+              {T.cancelled}
+              <Info>{T.cancelledHint}</Info>
+            </span>
+            <input type="checkbox" checked={cancelled} onChange={(e) => setCancelled(e.target.checked)} />
+          </label>
+        )}
         {tx && !draft && (
           <button
             type="button"
@@ -534,6 +705,11 @@ export function TxForm({
         )}
       </form>
       {!tx && !draft && <Tour id="tx-form" steps={formTour} delay={500} />}
+      {mode === CUSTOM && chosen.length > 0 && <NewTip id="myPart" target=".sheet .share-row--mine input" />}
+      {tx && canInst && !instBlock && <NewTip id="convert" target=".sheet [data-tour='convert']" />}
+      {tx && !draft && !transfer && !tx.kind && (!(canInst && !instBlock) || tourSeen('new-convert')) && (
+        <NewTip id="cancel" target=".sheet [data-tour='cancel']" />
+      )}
       {adding === 'category' && <CategoryForm defaultKind={income ? 'income' : 'spend'} onClose={() => setAdding(null)} onSaved={setCategoryId} />}
       {adding === 'account' && <AccountForm onClose={() => setAdding(null)} onSaved={setAccountId} />}
       {adding === 'split' && <SplitPresetForm onClose={() => setAdding(null)} onSaved={setMode} />}

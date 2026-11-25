@@ -3,7 +3,9 @@
  * App web không có máy chủ nên: mở app là kiểm tra ngay; lúc app đóng thì nhờ service worker
  * (Periodic Background Sync — chỉ Android / Chrome đã cài app) đọc bản tóm tắt lưu trong Cache Storage.
  */
-import { monthOf, budgetReport, nextDuePeriod, periodInfo, statement, todayISO } from './domain/calc';
+import { buildPlan } from './domain/advice';
+import { personName } from './domain/split';
+import { cardSettings, monthOf, statementPaid, budgetReport, nextDuePeriod, periodInfo, statement, todayISO } from './domain/calc';
 import { dm, money } from './domain/format';
 import type { AppData } from './domain/types';
 import { L } from './labels';
@@ -87,18 +89,38 @@ export function pending(data: AppData, now = new Date()) {
 
   if (dailyDue(data, now) && done.daily !== today) out.push({ key: 'daily', title: R.dailyTitle, body: R.dailyBody, tag: 'daily' });
 
-  if (r.cardDays !== undefined && data.accounts.some((a) => a.kind === 'credit')) {
-    const p = nextDuePeriod(today, data.settings);
-    const due = periodInfo(p, data.settings).due;
+  // Mỗi thẻ nhắc theo hạn trả riêng của thẻ đó.
+  for (const card of r.cardDays !== undefined ? data.accounts.filter((a) => a.kind === 'credit') : []) {
+    const cs = cardSettings(data, card.id);
+    const p = nextDuePeriod(today, cs);
+    const due = periodInfo(p, cs).due;
     const left = daysBetween(today, due);
-    const total = statement(data, p).total;
-    if (total > 0 && left >= 0 && left <= r.cardDays && done[`card:${p}`] !== today)
+    // Trừ phần đã chuyển trả: trả đủ rồi thì thôi nhắc.
+    const total = Math.max(0, statement(data, p, card.id).total - statementPaid(data, p, card.id));
+    if (total > 0 && left >= 0 && left <= r.cardDays! && done[`card:${card.id}:${p}`] !== today)
       out.push({
-        key: `card:${p}`,
-        title: R.cardTitle,
+        key: `card:${card.id}:${p}`,
+        title: `${R.cardTitle} · ${card.name}`,
         body: left === 0 ? t(R.cardToday, { amount: money(total) }) : t(R.cardBody, { n: left, date: dm(due), amount: money(total) }),
-        tag: 'card',
+        tag: `card:${card.id}`,
       });
+  }
+
+  // Nhắc đòi tiền người khác nợ trước ngày cần nhận (hạn thẻ đã quẹt khoản đó / ngày hẹn), cùng mốc với nhắc trả thẻ.
+  if (r.cardDays !== undefined) {
+    const plan = buildPlan(data, today);
+    const per = new Map<string, { amount: number; date: string; late: boolean }>();
+    for (const i of plan.incoming) {
+      const cur = per.get(i.person);
+      per.set(i.person, cur ? { ...cur, amount: cur.amount + i.amount, date: i.date < cur.date ? i.date : cur.date } : { amount: i.amount, date: i.date, late: i.late });
+    }
+    for (const [id, v] of per) {
+      const left = daysBetween(today, v.date);
+      const key = `owed:${id}:${v.date}${v.late ? ':late' : ''}`;
+      if (done[key] || (!v.late && (left < 0 || left > r.cardDays))) continue;
+      const vars = { name: personName(data.settings, id), amount: money(v.amount), date: dm(v.date), n: left };
+      out.push({ key, title: v.late ? R.owedLateTitle : R.owedTitle, body: t(v.late ? R.owedLateBody : R.owedBody, vars), tag: `owed:${id}` });
+    }
   }
 
   if (r.budgetPct !== undefined) {
@@ -136,15 +158,24 @@ export async function saveBackgroundState(data: AppData) {
   if (!('caches' in window)) return;
   const r = data.settings.reminders ?? {};
   const today = todayISO();
-  const hasCard = data.accounts.some((a) => a.kind === 'credit');
-  const p = hasCard ? nextDuePeriod(today, data.settings) : undefined;
+  // Thẻ đến hạn sớm nhất còn phải trả.
+  const next = data.accounts
+    .filter((a) => a.kind === 'credit')
+    .map((a) => {
+      const cs = cardSettings(data, a.id);
+      const p = nextDuePeriod(today, cs);
+      return { due: periodInfo(p, cs).due, left: Math.max(0, statement(data, p, a.id).total - statementPaid(data, p, a.id)) };
+    })
+    .filter((x) => x.left > 0)
+    .sort((a, b) => a.due.localeCompare(b.due))[0];
+  const cardLeft = next?.left ?? 0;
   const state = {
     dailyHour: r.dailyHour ?? null,
     lastLogged: loggedToday(data, today) ? today : null,
     daily: { title: R.dailyTitle, body: R.dailyBody },
     card:
-      p && r.cardDays !== undefined && statement(data, p).total > 0
-        ? { due: periodInfo(p, data.settings).due, days: r.cardDays, title: R.cardTitle, body: t(R.cardToday, { amount: money(statement(data, p).total) }) }
+      next && r.cardDays !== undefined
+        ? { due: next.due, days: r.cardDays, title: R.cardTitle, body: t(R.cardToday, { amount: money(cardLeft) }) }
         : null,
   };
   try {

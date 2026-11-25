@@ -718,7 +718,8 @@ p {
 .ledger dd {
   margin: 0;
   text-align: right;
-  overflow-wrap: anywhere;
+  /* Số tiền không bị ngắt giữa chừng; phần chữ bên trái tự xuống dòng. */
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .ledger__total {
@@ -1776,6 +1777,13 @@ button.budget-item {
 .switch-row input[type='checkbox']:checked::after {
   transform: translateX(18px);
   background: #fff;
+}
+.switch-row--off > span {
+  opacity: 0.6;
+}
+.switch-row--off input[type='checkbox'] {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ================= Nguồn tiền khi nhập tự động ================= */
@@ -3330,4 +3338,572 @@ button.budget-item {
   display: flex;
   justify-content: center;
   min-height: 44px;
+}
+
+/* Tab Thẻ: nút trả + "Đã trả hết ở ngân hàng" */
+.card-pay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+.link--on-accent {
+  color: inherit;
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Dòng con khi bấm "Chi tiết" */
+.ledger .ledger__sub {
+  padding-left: 14px;
+  font-size: 0.9em;
+  opacity: 0.75;
+}
+
+/* "Đủ tiền không?" dạng bảng tính: dòng tạm tính có gạch trên */
+.ledger--sheet .ledger__subtotal {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+  font-weight: 600;
+}
+
+/* Khả năng thanh toán */
+.payplan {
+  display: grid;
+  gap: 18px;
+}
+.payplan__head {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+}
+.payplan__status {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.payplan__big {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+}
+.payplan__sub,
+.payplan__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.payplan section {
+  display: grid;
+  gap: 6px;
+}
+.payplan h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.payplan__hint {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.payplan__list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+.payplan__cut {
+  margin: 0;
+  font-weight: 600;
+}
+.payplan__range {
+  width: 100%;
+}
+.payplan__tap {
+  cursor: pointer;
+}
+.payplan__promise {
+  display: block !important;
+}
+.payplan__promise label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.payplan__date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.payplan__hint.neg {
+  color: var(--neg);
+}
+.payplan__alt {
+  margin: 0;
+  font-weight: 600;
+}
+.advice-hint {
+  font-weight: 600;
+}
+.advice-hint.neg {
+  color: var(--neg);
+}
+.card h3.section-title {
+  margin-top: 18px;
+}
+.card > .advice-hint {
+  margin: 8px 0 0;
+}
+
+/* Icon 3D, hình minh họa */
+.art {
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.25));
+}
+.tile__icon {
+  background: none;
+}
+.empty-art {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px 16px 12px;
+}
+.empty-art .empty {
+  margin: 0;
+  padding: 0;
+}
+.rpt-empty .art {
+  margin: 0 auto 8px;
+}
+.piggy {
+  flex: none;
+  display: block;
+}
+/* Icon ⓘ: chạm mới hiện giải thích */
+.info {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.info__btn {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -4px 0 -4px 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.info__btn[aria-expanded='true'] {
+  color: var(--accent-text);
+}
+.info__pop {
+  position: fixed;
+  z-index: 60;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2, #333);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-transform: none;
+  letter-spacing: normal;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Ô quan trọng nhất ở màn chính chiếm cả hàng */
+.tiles > .tile--wide {
+  grid-column: 1 / -1;
+}
+.tile--wide .tile__value {
+  font-size: clamp(22px, 6.4vw, 26px);
+}
+.tiles:has(.tile--wide) > .tile:last-child:nth-child(odd) {
+  grid-column: auto;
+}
+.tiles:has(.tile--wide) > .tile:last-child:nth-child(even) {
+  grid-column: 1 / -1;
+}
+.tiles > .tile--wide:last-child {
+  grid-column: 1 / -1;
+}
+
+/* Tab Thẻ */
+.card-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.card-picker .segmented {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+}
+.card-picker .icon-btn {
+  flex: none;
+}
+.card-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 10px;
+}
+.recon-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  justify-self: center;
+  color: var(--muted);
+}
+
+/* Ngân sách: phần bấm mới mở */
+.card--folds {
+  display: grid;
+  gap: 2px;
+  padding-block: 6px;
+}
+.fold + .fold {
+  border-top: 1px solid var(--line);
+}
+.fold summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.fold summary::-webkit-details-marker {
+  display: none;
+}
+.fold summary::after {
+  content: '›';
+  font-size: 20px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+.fold[open] summary::after {
+  transform: rotate(90deg);
+}
+.fold > :not(summary) {
+  margin-bottom: 12px;
+}
+
+/* Khả năng thanh toán: kết luận và thanh kéo luôn thấy khi cuộn */
+.payplan__stick {
+  position: sticky;
+  top: 50px; /* ngay dưới tiêu đề bảng (cũng dính khi cuộn) */
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  margin: 0 -16px;
+  padding: 8px 16px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.payplan__stick .payplan__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Cài đặt: tên nhóm */
+.menu-group {
+  margin: 0 0 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ================= Gộp trả góp: chọn nhiều khoản trong Sổ chi ================= */
+.pick-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -4px;
+}
+.tx__pick {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.tx--picked {
+  background: var(--surface-2);
+}
+.tx--picked .tx__pick {
+  color: var(--accent);
+}
+.tx--dim {
+  opacity: 0.35;
+  cursor: default;
+}
+.pick-bar {
+  position: sticky;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 99px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
+}
+
+/* ---------- Robot hỏi đáp ---------- */
+.bot {
+  position: fixed;
+  z-index: 9;
+  right: 14px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent), 0 0 0 1px var(--line);
+  animation: bot-bob 3s ease-in-out infinite;
+}
+.bot:active {
+  transform: scale(0.94);
+}
+body:has(.pick-bar) .bot {
+  display: none;
+}
+@media (min-width: 900px) {
+  .bot {
+    right: 24px;
+    bottom: 24px;
+    width: 60px;
+    height: 60px;
+  }
+}
+@keyframes bot-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
+}
+.bot__eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: bot-blink 4s infinite;
+}
+@keyframes bot-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bot, .bot__eye { animation: none; }
+}
+.bot-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 40dvh;
+  padding-bottom: 8px;
+}
+.bot-hello {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 8px 0;
+}
+.bot-hello__art {
+  color: var(--accent);
+}
+.bot-hello .chips {
+  justify-content: center;
+}
+.bot-msg {
+  max-width: 92%;
+  padding: 10px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.bot-msg--user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-bottom-right-radius: 4px;
+}
+.bot-msg--ai {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-bottom-left-radius: 4px;
+  overflow-x: auto;
+}
+.bot-msg--ai p { margin: 0 0 6px; }
+.bot-msg--ai ul { margin: 0 0 6px; padding-left: 18px; }
+.bot-msg--busy { color: var(--muted); font-style: italic; }
+.bot-table {
+  border-collapse: collapse;
+  margin: 4px 0 8px;
+  font-size: 13px;
+}
+.bot-table th, .bot-table td {
+  border-bottom: 1px solid var(--line);
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.bot-table td:last-child, .bot-table th:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+.bot-input {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding-top: 8px;
+  background: var(--surface);
+}
+.bot-input input {
+  flex: 1;
+  min-width: 0;
+}
+.bot-input input {
+  padding: 11px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.bot-input input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ================= Có gì mới ================= */
+.news__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.news__list li {
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+}
+.news__list li span {
+  color: var(--muted);
+}
+.news__release + .news__release {
+  margin-top: 16px;
+}
+.news__date {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--accent-text);
+}
+.sheet .news__list {
+  padding: 4px 0 8px;
+}
+
+/* ================= Mục tiêu: các lần bỏ tiền ================= */
+.deposit-list {
+  display: grid;
+  gap: 6px;
+}
+.deposit-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.deposit-row > span {
+  flex: 1;
+  display: grid;
+}
+.deposit-row small {
+  color: var(--muted);
+}
+.deposit-row__opening {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Khoản đã huỷ: vẫn hiện nhưng gạch ngang, mờ */
+.tx--cancelled .tx__title,
+.tx--cancelled .tx__amt {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+.tag--cancelled {
+  color: var(--muted);
+}
+
+/* Lịch sử nhận tiền: chạm mở tại chỗ */
+.receipt summary {
+  list-style: none;
+  cursor: pointer;
+}
+.receipt summary::-webkit-details-marker {
+  display: none;
+}
+.receipt[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+.receipt__items {
+  padding-left: 14px;
+  font-size: 0.92em;
+  opacity: 0.85;
+}
+.receipt > .btn {
+  margin: 6px 0 10px;
+}
+
+/* Ví: 1 lần chuyển trả nhiều khoản = 1 dòng, chạm mở */
+.ledger__group {
+  display: grid;
+  gap: 6px;
+}
+.ledger__group summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  list-style: none;
+  cursor: pointer;
+}
+.ledger__group summary::-webkit-details-marker {
+  display: none;
+}
+.ledger__group summary dt::before {
+  content: '▸ ';
+}
+.ledger__group[open] summary dt::before {
+  content: '▾ ';
 }

@@ -6,11 +6,11 @@ import { money, uid } from '../domain/format';
 import { customRatios, peopleOf, personName, presetLabel } from '../domain/split';
 import type { Account, Category, Person, SplitPreset } from '../domain/types';
 import { isAppData, useStore } from '../store';
-import { Card, MoneyInput, NumberInput, Sheet } from '../components/ui';
+import { Card, MoneyInput, NumberInput, Sheet, Info } from '../components/ui';
 import { DriveCard } from '../sync/DriveCard';
 import { useDriveSync } from '../sync/DriveSync';
 import { AccountForm, CategoryForm, accountKinds } from '../components/Manage';
-import { CatBadge, Icon, type IconName } from '../components/icons';
+import { Art, CatBadge, Icon, type IconName } from '../components/icons';
 import { LookPicker } from '../components/LookPicker';
 import { RecurringSection } from './Recurring';
 import { MigrateCard } from '../components/MigrateCard';
@@ -18,14 +18,22 @@ import { LockSection, RemindSection } from './Security';
 import { activeCount } from '../remind';
 import { getLock } from '../lock';
 import { Guide } from './Guide';
-import { DEFAULT_GEMINI_MODEL, getApiKey, getGeminiModel, getProvider, setApiKey, setGeminiModel, setProvider } from '../ai/key';
+import { DEFAULT_GEMINI_MODEL, GEMINI_MODELS, getApiKey, getGeminiModel, getProvider, setApiKey, setGeminiModel, setProvider } from '../ai/key';
 import { forgetGmailAccount, getGmailAccount } from '../sync/gmail';
 import { L } from '../labels';
 import { t } from '../i18n';
 
 export type Section = 'account' | 'help' | 'look' | 'remind' | 'lock' | 'money' | 'sources' | 'recurring' | 'categories' | 'split' | 'ai' | 'data';
 
-export function Settings({ initial }: { initial?: Section }) {
+/** Gom 12 mục thành 4 nhóm cho dễ tìm. */
+const menuGroups: { title: string; ids: Section[] }[] = [
+  { title: L.settings.groups.money, ids: ['money', 'sources', 'recurring', 'categories', 'split'] },
+  { title: L.settings.groups.remind, ids: ['remind', 'lock'] },
+  { title: L.settings.groups.look, ids: ['look'] },
+  { title: L.settings.groups.data, ids: ['account', 'data', 'ai', 'help'] },
+];
+
+export function Settings({ initial, theme, toggleTheme, onShared }: { initial?: Section; theme: string; toggleTheme: () => void; onShared?: () => void }) {
   const { data } = useStore();
   const { session } = useDriveSync();
   const [section, setSection] = useState<Section | null>(initial ?? null);
@@ -33,8 +41,8 @@ export function Settings({ initial }: { initial?: Section }) {
 
   const menu: { id: Section; icon: IconName; title: string; sub: string }[] = [
     { id: 'account', icon: 'user', title: L.settings.menu.account, sub: session ? session.email : L.settings.menu.accountNoLogin },
-    { id: 'help', icon: 'help', title: L.settings.menu.help, sub: L.settings.menu.helpSub },
-    { id: 'look', icon: 'palette', title: L.settings.menu.look, sub: L.settings.menu.lookSub },
+    { id: 'help', icon: 'help', title: L.settings.menu.help, sub: '' },
+    { id: 'look', icon: 'palette', title: L.settings.menu.look, sub: '' },
     {
       id: 'remind',
       icon: 'notifications',
@@ -83,6 +91,10 @@ export function Settings({ initial }: { initial?: Section }) {
         {section === 'help' && <Guide />}
         {section === 'look' && (
           <Card>
+            <label className="switch-row">
+              <span>{L.nav.darkMode}</span>
+              <input type="checkbox" checked={theme === 'dark'} onChange={toggleTheme} />
+            </label>
             <LookPicker />
           </Card>
         )}
@@ -99,24 +111,35 @@ export function Settings({ initial }: { initial?: Section }) {
     );
   }
 
+  const row = (icon: IconName, title: string, sub: string, onClick: () => void) => (
+    <li key={title}>
+      <button className="menu-row" onClick={onClick}>
+        <span className="mini-icon">
+          <Art name={icon} size={26} />
+        </span>
+        <span className="menu-row__text">
+          <b>{title}</b>
+          {sub && <small>{sub}</small>}
+        </span>
+        <Icon name="right" size={20} className="muted" />
+      </button>
+    </li>
+  );
+
   return (
     <div className="stack">
-      <ul className="menu-list">
-        {menu.map((m) => (
-          <li key={m.id}>
-            <button className="menu-row" onClick={() => setSection(m.id)}>
-              <span className="mini-icon">
-                <Icon name={m.icon} size={20} />
-              </span>
-              <span className="menu-row__text">
-                <b>{m.title}</b>
-                <small>{m.sub}</small>
-              </span>
-              <Icon name="right" size={20} className="muted" />
-            </button>
-          </li>
-        ))}
-      </ul>
+      {menuGroups.map((g) => (
+        <section key={g.title}>
+          <h2 className="menu-group">{g.title}</h2>
+          <ul className="menu-list">
+            {g.ids.map((id) => {
+              const m = menu.find((x) => x.id === id)!;
+              return row(m.icon, m.title, m.sub, () => setSection(id));
+            })}
+            {g.ids.includes('split') && onShared && row('users', L.nav.shared, '', onShared)}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }
@@ -135,10 +158,6 @@ function MoneySection() {
           <label className="field">
             <span>{L.settings.money.cashOnHand}</span>
             <MoneyInput value={s.cashOnHand} onChange={(n) => set({ cashOnHand: n })} />
-          </label>
-          <label className="field">
-            <span>{L.settings.money.savingsFund}</span>
-            <MoneyInput value={s.savingsFund} onChange={(n) => set({ savingsFund: n })} />
           </label>
         </div>
       </Card>
@@ -172,7 +191,7 @@ function SourcesSection() {
           <li key={a.id}>
             <button className="row-btn row-btn--icon" onClick={() => setEdit(a)}>
               <span className="mini-icon">
-                <Icon name={accountKinds.find((k) => k.id === a.kind)?.icon ?? 'money'} size={20} />
+                <Art name={accountKinds.find((k) => k.id === a.kind)?.icon ?? 'money'} size={26} />
               </span>
               <span>
                 <b>{a.name}</b>
@@ -235,8 +254,7 @@ function PeopleCard() {
     setName(p === 'new' ? '' : p.name);
   };
   return (
-    <Card title={P.title}>
-      <p className="hint">{P.hint}</p>
+    <Card title={P.title} info={P.hint}>
       {people.length === 0 ? (
         <p className="empty">{P.empty}</p>
       ) : (
@@ -298,8 +316,7 @@ function SplitSection() {
   return (
     <>
       <PeopleCard />
-      <Card title={L.settings.ratiosTitle}>
-        <p className="hint">{L.settings.ratiosHint}</p>
+      <Card title={L.settings.ratiosTitle} info={L.settings.ratiosHint}>
         {ratios.length === 0 && <p className="empty">{L.settings.ratiosEmpty}</p>}
         <ul className="plain-list">
           {ratios.map((p) => (
@@ -389,7 +406,7 @@ function AiSection() {
   const [s, set] = useSet();
   const [provider, setProv] = useState(getProvider());
   const [apiKey, setKey] = useState(getApiKey());
-  const [model, setModel] = useState(getGeminiModel() === DEFAULT_GEMINI_MODEL ? '' : getGeminiModel());
+  const [model, setModel] = useState(getGeminiModel());
   const [gmail, setGmail] = useState(getGmailAccount());
   const [check, setCheck] = useState('');
   const [checking, setChecking] = useState(false);
@@ -459,17 +476,34 @@ function AiSection() {
             {L.settings.ai.keyLocal}
           </p>
           {provider === 'gemini' && (
-            <label className="field">
+            <div className="field">
               <span>{L.settings.ai.model}</span>
+              <div className="chips">
+                {GEMINI_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="chip"
+                    aria-pressed={model === m.id}
+                    onClick={() => {
+                      setModel(m.id);
+                      setGeminiModel(m.id);
+                    }}
+                  >
+                    {m.label} · {m.sub}
+                  </button>
+                ))}
+              </div>
               <input
-                value={model}
-                placeholder={DEFAULT_GEMINI_MODEL}
+                value={GEMINI_MODELS.some((m) => m.id === model) ? '' : model}
+                placeholder={L.settings.ai.modelOther}
+                aria-label={L.settings.ai.modelOther}
                 onChange={(e) => {
-                  setModel(e.target.value);
-                  setGeminiModel(e.target.value);
+                  setModel(e.target.value.trim() || DEFAULT_GEMINI_MODEL);
+                  setGeminiModel(e.target.value.trim());
                 }}
               />
-            </label>
+            </div>
           )}
         </div>
       </Card>
@@ -478,7 +512,7 @@ function AiSection() {
           <label className="switch-row">
             <span>
               <b>{L.settings.ai.redact}</b>
-              <small>{L.settings.ai.redactSub}</small>
+              <Info>{L.settings.ai.redactSub}</Info>
             </span>
             <input type="checkbox" checked={s.aiRedact !== false} onChange={(e) => set({ aiRedact: e.target.checked })} />
           </label>
@@ -579,8 +613,7 @@ function AccountSection() {
           )}
         </div>
       </Card>
-      <Card title={L.settings.account.borrowedTitle}>
-        <p className="hint">{L.settings.account.borrowedHint}</p>
+      <Card title={L.settings.account.borrowedTitle} info={L.settings.account.borrowedHint}>
         <button className="btn btn--danger-ghost btn--block" onClick={signOutEverywhere}>
           {L.settings.account.wipeButton}
         </button>
@@ -617,8 +650,7 @@ function DataSection() {
     <>
       <DriveCard />
       <MigrateCard />
-      <Card title={L.settings.data.viewTitle}>
-        <p className="hint">{L.settings.data.viewHint}</p>
+      <Card title={L.settings.data.viewTitle} info={L.settings.data.viewHint}>
         <button
           className="btn btn--primary btn--block add-btn"
           disabled={busy}
@@ -634,8 +666,7 @@ function DataSection() {
           {busy ? L.settings.data.exporting : L.settings.data.exportExcel}
         </button>
       </Card>
-      <Card title={L.settings.data.jsonTitle}>
-        <p className="hint">{L.settings.data.jsonHint}</p>
+      <Card title={L.settings.data.jsonTitle} info={L.settings.data.jsonHint}>
         <Row>
           <button className="btn" onClick={exportJson}>
             {L.settings.data.download}

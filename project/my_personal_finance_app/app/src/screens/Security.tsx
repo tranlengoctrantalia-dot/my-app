@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import type { Reminders } from '../domain/types';
 import { useStore } from '../store';
-import { Card } from '../components/ui';
+import { Card, Info } from '../components/ui';
 import { askPermission, isIOS, isStandalone, notify, permission, registerBackground, type Perm } from '../remind';
 import { bioAvailable, disableBio, disableLock, enableBio, setPin, useLockConfig } from '../lock';
 import { L } from '../labels';
@@ -35,7 +35,7 @@ export function RemindSection() {
       <label className="switch-row">
         <span>
           {title}
-          <small>{sub}</small>
+          <Info>{sub}</Info>
         </span>
         <input type="checkbox" checked={r[key] !== undefined} onChange={(e) => void toggle(key, e.target.checked)} />
       </label>
@@ -53,7 +53,7 @@ export function RemindSection() {
 
   return (
     <>
-      <Card title={R.permTitle}>
+      <Card title={R.permTitle} info={<Rich text={R.how} />}>
         {perm === 'granted' ? (
           <p className="pos">{R.permOn}</p>
         ) : perm === 'denied' ? (
@@ -76,11 +76,6 @@ export function RemindSection() {
         {hasCard && row('cardDays', R.card, R.cardSub, CARD_DAYS, (n) => t(R.cardDays, { n }))}
         {row('budgetPct', R.budget, R.budgetSub, PCTS, (n) => `${n}%`)}
       </Card>
-      <Card title={R.howTitle}>
-        <p className="hint">
-          <Rich text={R.how} />
-        </p>
-      </Card>
     </>
   );
 }
@@ -99,7 +94,7 @@ export function LockSection() {
         <label className="switch-row">
           <span>
             {K.enable}
-            <small>{K.enableSub}</small>
+            <Info>{K.enableSub}</Info>
           </span>
           <input
             type="checkbox"
@@ -120,7 +115,7 @@ export function LockSection() {
               <label className="switch-row">
                 <span>
                   {K.bio}
-                  <small>{K.bioSub}</small>
+                  <Info>{K.bioSub}</Info>
                 </span>
                 <input
                   type="checkbox"
@@ -140,7 +135,6 @@ export function LockSection() {
           </>
         )}
       </Card>
-      <p className="hint">{K.note}</p>
     </>
   );
 }

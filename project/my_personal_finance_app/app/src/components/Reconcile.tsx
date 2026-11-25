@@ -2,69 +2,104 @@
 import { useRef, useState } from 'react';
 import { dm, money, uid } from '../domain/format';
 import { reconcile, type StatementLine } from '../domain/reconcile';
-import type { Transaction } from '../domain/types';
+import type { PeriodKey, Transaction } from '../domain/types';
+import { cardSettings, periodInfo } from '../domain/calc';
+import { GmailError, bankQuery, fetchBankEmails } from '../sync/gmail';
+import { CLIENT_ID } from '../sync/googleDrive';
 import { useStore } from '../store';
-import { Sheet } from './ui';
+import { Sheet, Info } from './ui';
 import { Icon } from './icons';
 import { L } from '../labels';
 import { Rich, t } from '../i18n';
 
 const R = L.reconcile;
+const hasClientId = !!CLIENT_ID;
 type Line = StatementLine & { categoryId: string };
 
-export function ReconcileSheet({ accountId, onEdit, onClose }: { accountId: string; onEdit: (t: Transaction) => void; onClose: () => void }) {
+export function ReconcileSheet({
+  accountId,
+  period,
+  onEdit,
+  onClose,
+}: {
+  accountId: string;
+  /** Kỳ sao kê đang xem: quét email chỉ lấy giao dịch trong kỳ này. */
+  period: PeriodKey;
+  onEdit: (t: Transaction) => void;
+  onClose: () => void;
+}) {
   const { data, dispatch } = useStore();
+  const info = periodInfo(period, cardSettings(data, accountId));
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [lines, setLines] = useState<Line[] | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
 
-  async function read(files: File[]) {
+  /** Đọc file (PDF / ảnh) hoặc email ngân hàng → các dòng sao kê → so với app. */
+  async function analyze(source: { files?: File[]; gmail?: boolean }) {
     setBusy(true);
     setError('');
     try {
-      // Dùng lại phần đọc PDF / AI của "AI quét"; chỉ tải khi cần.
+      // Dùng lại phần đọc PDF / AI / Gmail của "AI quét"; chỉ tải khi cần.
       const [{ readPdf, PdfSkipped }, ex, { extractLocally }, { getApiKey }] = await Promise.all([
         import('../ai/pdf'),
         import('../ai/extract'),
         import('../ai/local'),
         import('../ai/key'),
       ]);
+      const files = source.files ?? [];
       const images = await Promise.all(files.filter((f) => f.type.startsWith('image/')).map(ex.fileToImage));
       const docs: { name: string; text: string }[] = [];
-      for (const f of files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) {
+      const openPdf = async (bytes: Uint8Array, name: string, owner: string) => {
         try {
-          const pdf = await readPdf(new Uint8Array(await f.arrayBuffer()), f.name, 'file');
-          if (pdf.text) docs.push({ name: f.name, text: pdf.text });
+          const pdf = await readPdf(bytes, name, owner);
           images.push(...pdf.images);
+          return pdf.text;
         } catch (e) {
           if (!(e instanceof PdfSkipped)) throw e;
           setError(e.message);
+          return '';
         }
+      };
+      for (const f of files.filter((f) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) {
+        const text = await openPdf(new Uint8Array(await f.arrayBuffer()), f.name, 'file');
+        if (text) docs.push({ name: f.name, text });
       }
+      // Email ngân hàng trong kỳ sao kê (cả file sao kê PDF đính kèm nếu có).
+      const emails = source.gmail ? await fetchBankEmails({ query: bankQuery(info.start, info.due), max: 100, skipIds: new Set() }) : [];
+      for (const m of emails) {
+        for (const a of m.attachments ?? []) {
+          const text = await openPdf(a.data, a.filename, m.from.match(/<([^>]+)>/)?.[1] ?? m.from);
+          if (text) m.text += `\n\n[Tệp đính kèm: ${a.filename}]\n${text}`;
+        }
+        delete m.attachments;
+      }
+      if (source.gmail && !emails.length) throw new Error(R.noEmails);
       const today = new Date().toISOString().slice(0, 10);
       const rows = getApiKey()
-        ? await ex.extractTransactions(data, { images, docs }, today)
+        ? await ex.extractTransactions(data, { images, docs, emails }, today)
         : images.length
           ? (() => {
               throw new Error(R.needAi);
             })()
-          : extractLocally(data, { docs }, today);
+          : extractLocally(data, { docs, emails }, today);
       const out = rows
         .filter((r) => r.type !== 'income')
+        // Email: chỉ lấy khoản trong kỳ và không phải của nguồn tiền khác (email báo trừ tài khoản ngân hàng…).
+        .filter((r) => !source.gmail || (r.date >= info.start && r.date <= info.end && (r.accountId === accountId || !data.accounts.some((a) => a.id === r.accountId))))
         .map((r) => ({ date: r.date, merchant: r.merchant, amount: r.type === 'refund' ? -Math.abs(r.amount) : Math.abs(r.amount), categoryId: r.categoryId }));
       if (!out.length) setError(R.nothing);
       setLines(out);
       setDone(new Set());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(e instanceof GmailError || e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   }
 
-  const res = lines ? reconcile(data, accountId, lines) : null;
+  const res = lines ? reconcile(data, accountId, lines, info) : null;
   const lineKey = (l: StatementLine) => `${l.date}|${l.amount}|${l.merchant}`;
   const missing = (res?.missing ?? []) as Line[];
   const todo = missing.filter((l) => !done.has(lineKey(l)));
@@ -94,12 +129,16 @@ export function ReconcileSheet({ accountId, onEdit, onClose }: { accountId: stri
   }
 
   return (
-    <Sheet title={R.title} onClose={onClose}>
+    <Sheet title={R.title} info={R.hint} onClose={onClose}>
       <div className="form">
-        {!res && <p className="hint">{R.hint}</p>}
         <button className="btn btn--block add-btn" disabled={busy} onClick={() => file.current?.click()}>
           <Icon name="fact_check" size={20} /> {busy ? R.reading : res ? R.again : R.pick}
         </button>
+        {hasClientId && (
+          <button className="btn btn--block" disabled={busy} onClick={() => void analyze({ gmail: true })}>
+            <Icon name="mail" size={20} /> {t(R.gmail, { range: `${dm(info.start)} – ${dm(info.end)}` })}
+          </button>
+        )}
         <input
           ref={file}
           type="file"
@@ -108,7 +147,7 @@ export function ReconcileSheet({ accountId, onEdit, onClose }: { accountId: stri
           hidden
           onChange={(e) => {
             // Chép danh sách file ra trước khi xoá ô chọn (xoá xong danh sách gốc thành rỗng).
-            if (e.target.files?.length) void read([...e.target.files]);
+            if (e.target.files?.length) void analyze({ files: [...e.target.files] });
             e.target.value = '';
           }}
         />
@@ -124,14 +163,13 @@ export function ReconcileSheet({ accountId, onEdit, onClose }: { accountId: stri
             {missing.length > 0 && (
               <section className="rec-group">
                 <header>
-                  <b>{t(R.missingTitle, { n: missing.length })}</b>
+                  <b>{t(R.missingTitle, { n: missing.length })}<Info>{R.missingHint}</Info></b>
                   {todo.length > 1 && (
                     <button className="link" onClick={() => todo.forEach(add)}>
                       {t(R.addAll, { n: todo.length })}
                     </button>
                   )}
                 </header>
-                <small className="muted">{R.missingHint}</small>
                 <ul className="plain-list">
                   {missing.map((l) => (
                     <li key={lineKey(l)} className="rec-row">
@@ -183,9 +221,11 @@ export function ReconcileSheet({ accountId, onEdit, onClose }: { accountId: stri
             {res.extra.length > 0 && (
               <section className="rec-group">
                 <header>
-                  <b>{t(R.extraTitle, { n: res.extra.length })}</b>
+                  <b>
+                    {t(R.extraTitle, { n: res.extra.length })}
+                    <Info>{R.extraHint}</Info>
+                  </b>
                 </header>
-                <small className="muted">{R.extraHint}</small>
                 <ul className="plain-list">
                   {res.extra.map(({ tx, dup }) => (
                     <li key={tx.id}>

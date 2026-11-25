@@ -6,8 +6,9 @@ import { dm, money, uid } from '../domain/format';
 import { goalStatus } from '../domain/goals';
 import type { Goal } from '../domain/types';
 import { useStore } from '../store';
-import { Card, Empty, MoneyInput, Progress, Sheet } from '../components/ui';
+import { Card, Empty, MoneyInput, Progress, Sheet, Info } from '../components/ui';
 import { Icon } from '../components/icons';
+import { NewTip } from '../components/WhatsNew';
 import { L } from '../labels';
 import { t } from '../i18n';
 
@@ -25,7 +26,7 @@ export function Goals() {
     <div className="stack">
       {goals.length === 0 && (
         <Card>
-          <Empty>{G.empty}</Empty>
+          <Empty art="bullseye">{G.empty}</Empty>
         </Card>
       )}
       {goals.map((g) => {
@@ -85,6 +86,7 @@ function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
   const [deadline, setDeadline] = useState(goal?.deadline ?? '');
   const [icon, setIcon] = useState(goal?.icon ?? 'flag');
   const [start, setStart] = useState(0);
+  const [deps, setDeps] = useState(goal?.deposits ?? []);
   const valid = name.trim() && target > 0;
   return (
     <Sheet title={goal ? G.formEdit : G.formNew} onClose={onClose}>
@@ -93,7 +95,8 @@ function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
         onSubmit={(e) => {
           e.preventDefault();
           if (!valid) return;
-          const deposits = goal?.deposits ?? (start > 0 ? [{ date: todayISO(), amount: start }] : []);
+          // Ô "Đã có sẵn" lúc tạo mới là tiền có từ trước: không tính vào tháng này.
+          const deposits = goal ? deps : start > 0 ? [{ date: todayISO(), amount: start, opening: true }] : [];
           dispatch({ type: 'upsertGoal', goal: { id: goal?.id ?? uid(), name: name.trim(), target, deadline: deadline || undefined, icon, deposits } });
           onClose();
         }}
@@ -111,6 +114,34 @@ function GoalForm({ goal, onClose }: { goal?: Goal; onClose: () => void }) {
             <span>{G.startSaved}</span>
             <MoneyInput value={start} onChange={setStart} />
           </label>
+        )}
+        {goal && deps.length > 0 && (
+          <div className="field">
+            <span>{G.history}</span>
+            <ul className="plain-list deposit-list">
+              {deps.map((d, i) => (
+                <li key={i} className="deposit-row">
+                  <span>
+                    <b className={d.amount < 0 ? 'neg' : ''}>{money(d.amount)}</b>
+                    <small>{dm(d.date)}</small>
+                  </span>
+                  {d.amount > 0 && (
+                    <label className="deposit-row__opening">
+                      <small>{G.openingShort}</small>
+                      <input
+                        type="checkbox"
+                        checked={!!d.opening}
+                        onChange={(e) => setDeps((xs) => xs.map((x, j) => (j === i ? { ...x, opening: e.target.checked || undefined } : x)))}
+                      />
+                    </label>
+                  )}
+                  <button type="button" className="link" onClick={() => setDeps((xs) => xs.filter((_, j) => j !== i))}>
+                    {G.historyDelete}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
         <label className="field">
           <span>{G.deadline}</span>
@@ -152,17 +183,19 @@ function DepositForm({ goal, sign, onClose }: { goal: Goal; sign: 1 | -1; onClos
   const { dispatch } = useStore();
   const st = goalStatus(goal, todayISO());
   const [amount, setAmount] = useState(0);
+  const [opening, setOpening] = useState(false);
   const quick = sign > 0 ? [st.monthly, st.left].filter((x, i, a) => x > 0 && a.indexOf(x) === i) : [st.saved];
   const max = sign < 0 ? st.saved : Infinity;
   return (
-    <Sheet title={t(sign > 0 ? G.depositTitle : G.withdrawTitle, { name: goal.name })} onClose={onClose}>
+    <Sheet title={t(sign > 0 ? G.depositTitle : G.withdrawTitle, { name: goal.name })} info={G.depositHint} onClose={onClose}>
       <form
         className="form"
         onSubmit={(e) => {
           e.preventDefault();
           if (amount <= 0) return;
           const n = Math.min(amount, max) * sign;
-          dispatch({ type: 'upsertGoal', goal: { ...goal, deposits: [...goal.deposits, { date: todayISO(), amount: n }] } });
+          const opened = sign > 0 && opening ? { opening: true } : {};
+          dispatch({ type: 'upsertGoal', goal: { ...goal, deposits: [...goal.deposits, { date: todayISO(), amount: n, ...opened }] } });
           onClose();
         }}
       >
@@ -179,7 +212,16 @@ function DepositForm({ goal, sign, onClose }: { goal: Goal; sign: 1 | -1; onClos
             ))}
           </div>
         )}
-        <p className="hint">{G.depositHint}</p>
+        {sign > 0 && (
+          <label className="switch-row" data-tour="opening">
+            <span>
+              {G.opening}
+              <Info>{G.openingHint}</Info>
+            </span>
+            <input type="checkbox" checked={opening} onChange={(e) => setOpening(e.target.checked)} />
+          </label>
+        )}
+        {sign > 0 && <NewTip id="opening" target=".sheet [data-tour='opening']" />}
         <button className="btn btn--primary btn--block" type="submit" disabled={amount <= 0}>
           {sign > 0 ? G.deposit : G.withdraw}
         </button>

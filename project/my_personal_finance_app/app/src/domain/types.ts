@@ -14,6 +14,23 @@ export interface Account {
    * Khi người dùng nhập "số dư hiện tại", app tính lại balanceAdjust cho khớp. Thẻ tín dụng: số âm = đang nợ.
    */
   balanceAdjust?: number;
+  /**
+   * Mốc số dư: ngày nhập + số dư thật lúc đó + id các khoản cùng ngày đã có lúc nhập.
+   * Có mốc thì số dư = số lúc nhập + các khoản SAU mốc; khoản ghi lùi ngày (nhập sao kê, ghi bù) không trừ lần nữa.
+   */
+  balanceAt?: {
+    date: ISODate;
+    amount: number;
+    seen: string[];
+    /** Phần đã trả lại CHƯA có ngày nhận (`TxSplit.log`) của từng khoản, lúc nhập số dư. */
+    paid?: Record<string, number>;
+    v?: number;
+    /** Giờ nhập số dư (ms): tiền trả lại ghi cùng ngày thì so giờ để biết trước hay sau mốc. */
+    ts?: number;
+  };
+  /** Thẻ tín dụng: ngày chốt sao kê / ngày hạn trả riêng của thẻ này (bỏ trống = dùng ngày chung trong Cài đặt). */
+  cutoffDay?: number;
+  dueDay?: number;
 }
 
 /**
@@ -42,6 +59,17 @@ export interface TxSplit {
   person: Counterparty;
   amount: number;
   paid: number;
+  /** Từng lần trả (hoặc sửa bớt): ngày nhận + số tiền chênh. Bản cũ không có; phần `paid` ngoài log là chưa rõ ngày. */
+  log?: PaidEntry[];
+}
+
+/** Một lần người khác trả lại tiền. `ts` = giờ ghi (ms), để so với mốc số dư cùng ngày. */
+export interface PaidEntry {
+  date: ISODate;
+  amount: number;
+  /** Phần trả dư (vượt số nợ) trong lần này: không tính vào nợ, vẫn cộng vào ví. */
+  extra?: number;
+  ts: number;
 }
 
 /** Người hay chia tiền cùng: người yêu, bạn bè, gia đình, công ty… */
@@ -61,6 +89,8 @@ export interface SplitPreset {
 
 export interface Transaction {
   id: string;
+  /** Đơn đã huỷ: vẫn hiện trong Sổ chi (gạch ngang) nhưng không tính vào đâu cả. */
+  cancelled?: boolean;
   date: ISODate;
   merchant: string;
   /** Tổng tiền giao dịch; âm nếu là hoàn tiền. */
@@ -80,6 +110,11 @@ export interface Transaction {
   note?: string;
   /** Đóng trước cho nhiều tháng (vd. quỹ T10 + T11): ví / thẻ trừ đủ ngày ghi, ngân sách chia đều cho từng tháng. */
   spreadMonths?: number;
+  /**
+   * Đã chuyển thành trả góp (id khoản trả góp): không tính chi tiêu / sao kê / số dư nữa (trả góp tính thay),
+   * chỉ giữ lại để theo dõi phần người khác còn nợ.
+   */
+  installmentId?: string;
   /**
    * 'income' = khoản thu; 'transfer' = chuyển tiền giữa hai nguồn của mình (từ accountId sang toAccountId,
    * không tính là chi hay thu); 'lend' = cho người khác vay (tiền ra, splits[0] = người vay + đã trả lại);
@@ -109,6 +144,8 @@ export interface Installment {
   ratePerYear?: number;
   /** Phí chuyển đổi trả góp, tính một lần vào kỳ đầu. */
   fee?: number;
+  /** Phần mình chịu (0–1) khi khoản mua có chia tiền: sao kê tính đủ, ngân sách chỉ tính phần này. Bỏ trống = 1. */
+  share?: number;
 }
 
 export interface BudgetLine {
@@ -125,12 +162,14 @@ export interface Budget {
 export interface Settings {
   /** Giao dịch có ngày <= cutoffDay thuộc kỳ trả tháng này; sau đó sang kỳ tháng sau. */
   cutoffDay: number;
+  /** Kỳ thẻ người dùng đánh dấu "đã trả hết ở ngân hàng" ('<id thẻ>:<kỳ>'): coi như đã trả đủ. */
+  cardSettled?: string[];
   dueDay: number;
   salaryDay: number;
   partnerName: string;
   /** Tiền đang có trong tài khoản, dùng để kiểm tra đủ trả thẻ. */
   cashOnHand: number;
-  /** Quỹ tiết kiệm riêng (không dùng để chi). */
+  /** Quỹ tiết kiệm riêng — bản cũ, không còn dùng (tiết kiệm / tiền đệm nằm ở Mục tiêu). */
   savingsFund: number;
   /** Bộ lọc Gmail để tìm email thông báo giao dịch. */
   gmailQuery?: string;
@@ -149,6 +188,8 @@ export interface Settings {
   /** Họ tên / từ riêng cần che, cách nhau bằng dấu phẩy. */
   privacyWords?: string;
   reminders?: Reminders;
+  /** Ngày người khác hẹn trả lại tiền cho mình (id người → ngày). */
+  promises?: Record<string, ISODate>;
 }
 
 /** Khoản lặp lại hàng tháng (tiền nhà, Netflix, lương…): app tự ghi khi tới ngày. */
@@ -183,8 +224,8 @@ export interface Goal {
   target: number;
   /** Hạn muốn đạt (để tính mỗi tháng cần để dành bao nhiêu). */
   deadline?: ISODate;
-  /** Các lần bỏ tiền vào (số âm = rút ra). */
-  deposits: { date: ISODate; amount: number }[];
+  /** Các lần bỏ tiền vào (số âm = rút ra). `opening` = tiền có từ trước: không tính vào tháng nào. */
+  deposits: { date: ISODate; amount: number; opening?: boolean }[];
 }
 
 /** Nhắc nhở / thông báo (lưu theo dữ liệu, đồng bộ cùng sao lưu). */

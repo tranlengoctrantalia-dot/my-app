@@ -95,14 +95,18 @@ export function Tour({ id, steps, delay = 400 }: { id: string; steps: TourStep[]
         <b>{step.title}</b>
         <p>{step.text}</p>
         <div className="tour__actions">
-          <button className="link" onClick={finish}>
-            {L.tour.skip}
-          </button>
-          <span className="tour__count">
-            {i + 1}/{visible.length}
-          </span>
+          {visible.length > 1 && (
+            <>
+              <button className="link" onClick={finish}>
+                {L.tour.skip}
+              </button>
+              <span className="tour__count">
+                {i + 1}/{visible.length}
+              </span>
+            </>
+          )}
           <button className="btn btn--primary" onClick={() => (last ? finish() : setI(i + 1))}>
-            {last ? L.tour.done : L.tour.next}
+            {visible.length === 1 ? L.news.gotIt : last ? L.tour.done : L.tour.next}
           </button>
         </div>
       </div>

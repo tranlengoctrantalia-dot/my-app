@@ -100,6 +100,7 @@ export type Insight =
  */
 export function insights(data: AppData, period: PeriodKey, opts: { partial?: boolean } = {}): Insight[] {
   const ids = spendCategoryIds(data);
+  const installmentIds = new Set(data.categories.filter((c) => c.kind === 'installment').map((c) => c.id));
   const cur = spentByCategory(data, period);
   const base = basePeriods(data, period, 3);
   const baseMaps = base.map((p) => spentByCategory(data, p));
@@ -111,7 +112,8 @@ export function insights(data: AppData, period: PeriodKey, opts: { partial?: boo
   if (base.length) {
     const all = new Set([...cur.keys(), ...baseMaps.flatMap((m) => [...m.keys()])]);
     for (const id of all) {
-      if (!ids.has(id)) continue;
+      // Trả góp là số cố định theo kỳ: tăng / giảm không phải thói quen chi tiêu.
+      if (!ids.has(id) || installmentIds.has(id)) continue;
       const value = cur.get(id) ?? 0;
       const avg = avgOf(id);
       const pct = pctChange(value, avg);

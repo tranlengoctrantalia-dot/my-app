@@ -1,17 +1,20 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { parseMoney, periodLabel, plain } from '../domain/format';
 import { shiftPeriod } from '../domain/calc';
-import { Icon } from './icons';
+import { Art, Icon, type IconName } from './icons';
 import { lockScroll } from '../viewport';
 import type { PeriodKey } from '../domain/types';
 import { L } from '../labels';
 
-export function Card({ title, action, children, tone }: { title?: ReactNode; action?: ReactNode; children: ReactNode; tone?: 'accent' }) {
+export function Card({ title, action, children, tone, info }: { title?: ReactNode; action?: ReactNode; children: ReactNode; tone?: 'accent'; info?: ReactNode }) {
   return (
     <section className={`card${tone ? ` card--${tone}` : ''}`}>
       {(title || action) && (
         <header className="card__head">
-          <h2>{title}</h2>
+          <h2>
+            {title}
+            {info && <Info>{info}</Info>}
+          </h2>
           {action}
         </header>
       )}
@@ -30,14 +33,25 @@ export function Progress({ value, max }: { value: number; max: number }) {
   );
 }
 
-export function PeriodPicker({ value, onChange, hint }: { value: PeriodKey; onChange: (p: PeriodKey) => void; hint?: string }) {
+export function PeriodPicker({
+  value,
+  onChange,
+  hint,
+  label,
+}: {
+  value: PeriodKey;
+  onChange: (p: PeriodKey) => void;
+  hint?: string;
+  /** Thay chữ "Tháng 11" (vd. tab Thẻ ghi "Kỳ trả 25/11" cho khỏi lẫn với tháng dương lịch). */
+  label?: (p: PeriodKey) => string;
+}) {
   return (
     <div className="period">
       <button className="icon-btn" aria-label={L.common.prevPeriod} onClick={() => onChange(shiftPeriod(value, -1))}>
         <Icon name="left" />
       </button>
       <div className="period__label">
-        <strong>{periodLabel(value)}</strong>
+        <strong>{label ? label(value) : periodLabel(value)}</strong>
         {hint && <small>{hint}</small>}
       </div>
       <button className="icon-btn" aria-label={L.common.nextPeriod} onClick={() => onChange(shiftPeriod(value, 1))}>
@@ -79,7 +93,7 @@ export function MoneyInput({
   );
 }
 
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({ title, onClose, children, info }: { title: string; onClose: () => void; children: ReactNode; info?: ReactNode }) {
   useEffect(() => lockScroll(), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -90,7 +104,10 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
         <header className="sheet__head">
-          <h2>{title}</h2>
+          <h2>
+            {title}
+            {info && <Info>{info}</Info>}
+          </h2>
           <button className="icon-btn" aria-label={L.common.close} onClick={onClose}>
             <Icon name="x" />
           </button>
@@ -101,8 +118,62 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
-export function Empty({ children }: { children: ReactNode }) {
-  return <p className="empty">{children}</p>;
+/** Màn trống: hình minh họa + một dòng + một nút (nếu có). */
+export function Empty({ children, art, action }: { children: ReactNode; art?: IconName; action?: ReactNode }) {
+  if (!art) return <p className="empty">{children}</p>;
+  return (
+    <div className="empty-art">
+      <Art name={art} size={96} />
+      <p className="empty">{children}</p>
+      {action}
+    </div>
+  );
+}
+
+/**
+ * Icon ⓘ đặt cạnh tên: chạm mới hiện giải thích ngắn (bong bóng), chạm ra ngoài thì tắt.
+ * Dùng thay cho mọi dòng chú thích trên màn hình.
+ */
+export function Info({ children }: { children: ReactNode }) {
+  const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!at) return;
+    const off = (e: Event) => {
+      if (!ref.current?.contains(e.target as Node)) setAt(null);
+    };
+    const close = () => setAt(null);
+    document.addEventListener('pointerdown', off, true);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('pointerdown', off, true);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [at]);
+  const toggle = (e: MouseEvent<HTMLButtonElement>) => {
+    // Nằm trong <label> (công tắc): không cho bật / tắt công tắc khi chạm ⓘ.
+    e.preventDefault();
+    e.stopPropagation();
+    if (at) return setAt(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    const width = Math.min(260, window.innerWidth - 32);
+    const left = Math.min(Math.max(16, r.left + r.width / 2 - width / 2), window.innerWidth - width - 16);
+    setAt({ top: r.bottom + 6, left, width });
+  };
+  return (
+    <span className="info" ref={ref}>
+      <button type="button" className="info__btn" aria-label={L.common.info} aria-expanded={!!at} onClick={toggle}>
+        <Icon name="info" size={16} />
+      </button>
+      {at && (
+        <span className="info__pop" role="tooltip" style={{ top: at.top, left: at.left, width: at.width }}>
+          {children}
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**

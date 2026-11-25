@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, type ReactNo
 import { starterCategories, starterData } from './data/starter';
 import { mergeSamePeople, migratePeople, migratePresets } from './domain/split';
 import type { Account, AppData, Budget, Category, Goal, Installment, Recurring, Settings, Transaction } from './domain/types';
-import { adjustFor, recurringDue } from './domain/calc';
+import { adjustFor, balanceAnchor, recurringDue } from './domain/calc';
 import { findPreset, splitByRatio } from './domain/split';
 import { uid } from './domain/format';
 
@@ -14,6 +14,8 @@ type Action =
   | { type: 'addTxs'; txs: Transaction[] }
   | { type: 'upsertAccount'; account: Account }
   | { type: 'deleteAccount'; id: string }
+  /** Xoá nguồn tiền đang có giao dịch: chuyển hết giao dịch sang nguồn `to` rồi xoá. */
+  | { type: 'mergeAccount'; from: string; to: string }
   | { type: 'upsertCategory'; category: Category }
   | { type: 'deleteCategory'; id: string }
   | { type: 'upsertInstallment'; item: Installment; category?: Category }
@@ -93,6 +95,19 @@ function apply(s: AppData, a: Exclude<Action, { type: 'replace' }>): AppData {
       return { ...s, accounts: upsert(s.accounts, a.account) };
     case 'deleteAccount':
       return { ...s, accounts: s.accounts.filter((x) => x.id !== a.id) };
+    case 'mergeAccount': {
+      const to = (id?: string) => (id === a.from ? a.to : id);
+      return {
+        ...s,
+        accounts: s.accounts.filter((x) => x.id !== a.from),
+        transactions: s.transactions
+          .map((t) => (t.accountId === a.from || t.toAccountId === a.from ? { ...t, accountId: to(t.accountId)!, toAccountId: to(t.toAccountId) } : t))
+          // Chuyển giữa 2 nguồn giờ thành cùng 1 nguồn → bỏ.
+          .filter((t) => !(t.kind === 'transfer' && t.accountId === t.toAccountId)),
+        recurring: s.recurring?.map((r) => (r.accountId === a.from ? { ...r, accountId: a.to } : r)),
+        installments: s.installments.map((i) => (i.accountId === a.from ? { ...i, accountId: a.to } : i)),
+      };
+    }
     case 'upsertCategory':
       return { ...s, categories: upsert(s.categories, a.category) };
     case 'deleteCategory':
@@ -108,7 +123,12 @@ function apply(s: AppData, a: Exclude<Action, { type: 'replace' }>): AppData {
         categories: a.category ? upsert(s.categories, a.category) : s.categories,
       };
     case 'deleteInstallment':
-      return { ...s, installments: s.installments.filter((i) => i.id !== a.id) };
+      // Khoản mua gốc (giữ lại vì có chia tiền) trở về thành khoản chi thường.
+      return {
+        ...s,
+        installments: s.installments.filter((i) => i.id !== a.id),
+        transactions: s.transactions.map((t) => (t.installmentId === a.id ? { ...t, installmentId: undefined } : t)),
+      };
     case 'upsertBudget':
       return {
         ...s,
@@ -137,7 +157,13 @@ function apply(s: AppData, a: Exclude<Action, { type: 'replace' }>): AppData {
       return {
         ...s,
         accounts: s.accounts.map((acc) =>
-          acc.id === a.accountId ? { ...acc, balanceAdjust: a.balance === undefined ? undefined : adjustFor(s, acc.id, a.balance) } : acc,
+          acc.id === a.accountId
+            ? {
+                ...acc,
+                balanceAdjust: a.balance === undefined ? undefined : adjustFor(s, acc.id, a.balance),
+                balanceAt: a.balance === undefined ? undefined : balanceAnchor(s, acc.id, a.balance),
+              }
+            : acc,
         ),
       };
     case 'settings':

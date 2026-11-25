@@ -8,7 +8,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg'],
-      workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2}'], importScripts: ['sw-remind.js'] },
+      workbox: { globPatterns: ['**/*.{js,css,html,svg,woff2,webp}'], importScripts: ['sw-remind.js'] },
       manifest: {
         name: 'Ví Gọn',
         short_name: 'Ví Gọn',

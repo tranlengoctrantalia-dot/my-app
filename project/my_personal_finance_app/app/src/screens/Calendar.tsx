@@ -1,6 +1,6 @@
 /** Lịch tiền: ngày lương, hạn trả thẻ, khoản định kỳ, hạn mục tiêu trong tháng. */
 import { useState } from 'react';
-import { parsePeriod, shiftPeriod, sum, todayISO } from '../domain/calc';
+import { budgetReport, parsePeriod, shiftPeriod, sum, todayISO } from '../domain/calc';
 import { dm, money, periodLabel } from '../domain/format';
 import { moneyEvents, type MoneyEvent } from '../domain/insights';
 import { useStore } from '../store';
@@ -26,7 +26,10 @@ export function Calendar() {
   const cells = [...Array(lead).fill(null), ...Array.from({ length: last }, (_, i) => `${month}-${String(i + 1).padStart(2, '0')}`)];
   const byDay = (d: string) => events.filter((e) => e.date === d);
   const shown = picked ? events.filter((e) => e.date === picked) : events;
-  const out = sum(events.filter((e) => !e.incoming).map((e) => e.amount ?? 0));
+  // Khoản cố định không có ngày riêng: còn phải chi bao nhiêu trong tháng (cùng số với Khả năng thanh toán).
+  const fixedLeft =
+    month < today.slice(0, 7) ? 0 : sum(budgetReport(data, month).rows.filter((r) => r.remaining > 0 && data.categories.find((c) => c.id === r.categoryId)?.kind === 'fixed').map((r) => r.remaining));
+  const out = fixedLeft + sum(events.filter((e) => !e.incoming).map((e) => e.amount ?? 0));
   const inc = sum(events.filter((e) => e.incoming).map((e) => e.amount ?? 0));
 
   return (
@@ -86,10 +89,23 @@ export function Calendar() {
       </Card>
 
       <Card title={picked ? dm(picked) : C.listTitle}>
-        {shown.length === 0 ? (
-          <Empty>{C.empty}</Empty>
+        {shown.length === 0 && !(fixedLeft > 0 && !picked) ? (
+          <Empty art="calendar_month">{C.empty}</Empty>
         ) : (
           <ul className="plain-list">
+            {fixedLeft > 0 && !picked && (
+              <li>
+                <div className="row-btn row-btn--icon row-btn--static">
+                  <span className="cal__icon cal__icon--recurring">
+                    <Icon name="calendar" size={18} />
+                  </span>
+                  <span>
+                    <b>{C.fixedLeft}</b>
+                  </span>
+                  <b>{money(fixedLeft)}</b>
+                </div>
+              </li>
+            )}
             {shown.map((e, i) => (
               <li key={i}>
                 <div className={`row-btn row-btn--icon row-btn--static${e.date < today ? ' cal__past' : ''}`}>

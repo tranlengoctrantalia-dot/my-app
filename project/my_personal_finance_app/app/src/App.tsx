@@ -1,4 +1,6 @@
 import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { ChatBot } from './components/ChatBot';
+import { NewTip } from './components/WhatsNew';
 import { isLoan, nextDuePeriod, monthOf, todayISO } from './domain/calc';
 import type { Transaction } from './domain/types';
 import { useStore } from './store';
@@ -18,7 +20,7 @@ import { Icon, type IconName } from './components/icons';
 import { RippleAvatar } from './components/Avatar';
 import { useTheme } from './theme';
 import { Welcome } from './screens/Welcome';
-import { Tour, type TourStep } from './components/Tour';
+import { Tour, tourSeen, type TourStep } from './components/Tour';
 import { captureJoinLink, sharedEnabled } from './shared/config';
 import { L } from './labels';
 
@@ -63,7 +65,6 @@ const homeTour = (hasCard: boolean): TourStep[] => {
     { target: '[data-tour="tx"]', ...s.tx },
     { target: '[data-tour="budget"]', ...s.budget },
     hasCard ? { target: '[data-tour="card"]', ...s.card } : { target: '[data-tour="split"]', ...s.split },
-    { target: '[data-tour="shared"]', ...s.shared },
     { target: '.avatar-btn', ...s.account },
     { target: '[data-tour="settings"]', ...s.settings },
   ];
@@ -115,9 +116,10 @@ function Main() {
     document.addEventListener('visibilitychange', onShow);
     return () => document.removeEventListener('visibilitychange', onShow);
   }, []);
+  const [instCard, setInstCard] = useState<string | null>(null);
   const [loan, setLoan] = useState<Transaction | null>(null);
   const [newLoan, setNewLoan] = useState(false);
-  const [payCard, setPayCard] = useState<{ amount: number; cardId: string } | null>(null);
+  const [payCard, setPayCard] = useState<{ amount: number; cardId: string; period: string } | null>(null);
   const [importing, setImporting] = useState(false);
   const [settingsSection, setSettingsSection] = useState<Section>();
   const openSettings = (section?: Section) => {
@@ -162,6 +164,7 @@ function Main() {
         {navItem(tabs[2])}
         {navItem(hasCard ? tabs[3] : splitTab)}
       </nav>
+      <ChatBot />
       <main className="main">
         <header className="topbar">
           {isSub ? (
@@ -181,14 +184,6 @@ function Main() {
             <button className="icon-btn" aria-label={hidden ? L.privacy.show : L.privacy.hide} aria-pressed={hidden} onClick={toggleHidden}>
               <Icon name={hidden ? 'visibility_off' : 'visibility'} />
             </button>
-            <button className="icon-btn" aria-label={theme === 'dark' ? L.nav.lightMode : L.nav.darkMode} onClick={toggleTheme}>
-              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
-            </button>
-            {!isSub && sharedEnabled && (
-              <button className="icon-btn" data-tour="shared" aria-label={L.nav.shared} onClick={() => setTab('shared')}>
-                <Icon name="users" />
-              </button>
-            )}
             {!isSub && (
               <button className="icon-btn" data-tour="settings" aria-label={L.nav.settings} onClick={() => openSettings()}>
                 <Icon name="settings" />
@@ -206,9 +201,15 @@ function Main() {
             remindToday={dailyDue(data)}
           />
         )}
-        {tab === 'tx' && <Transactions period={spendPeriod} setPeriod={setSpendPeriod} onEdit={edit} />}
+        {tab === 'tx' && <Transactions period={spendPeriod} setPeriod={setSpendPeriod} onEdit={edit} onAdd={() => setForm('new')} />}
         {tab === 'card' && hasCard && (
-          <CardStatement period={cardPeriod} setPeriod={setCardPeriod} onEdit={edit} onPay={(amount, cardId) => setPayCard({ amount, cardId })} />
+          <CardStatement
+            period={cardPeriod}
+            setPeriod={setCardPeriod}
+            onEdit={edit}
+            onPay={(amount, cardId) => setPayCard({ amount, cardId, period: cardPeriod })}
+            onAddInstallment={setInstCard}
+          />
         )}
         {tab === 'budget' && <Budget period={spendPeriod} setPeriod={setSpendPeriod} />}
         {tab === 'split' && <Split />}
@@ -224,9 +225,12 @@ function Main() {
             <Shared joinId={joinId} />
           </Suspense>
         )}
-        {tab === 'settings' && <Settings key={settingsSection ?? 'menu'} initial={settingsSection} />}
+        {tab === 'settings' && (
+          <Settings key={settingsSection ?? 'menu'} initial={settingsSection} theme={theme} toggleTheme={toggleTheme} onShared={sharedEnabled ? () => setTab('shared') : undefined} />
+        )}
       </main>
       {tab === 'home' && tourRun > 0 && !form && <Tour key={tourRun} id="home" steps={homeTour(hasCard)} />}
+      {tab === 'home' && !form && tourSeen('home') && <NewTip id="bot" target=".bot" />}
       {form && (
         <TxForm
           tx={form === 'new' || form === 'transfer' ? undefined : form}
@@ -242,12 +246,13 @@ function Main() {
           }}
         />
       )}
+      {instCard && <TxForm initialInstallment={instCard} onClose={() => setInstCard(null)} />}
       {loan && <LoanForm tx={loan} onClose={() => setLoan(null)} />}
       {newLoan && <LoanForm onClose={() => setNewLoan(false)} />}
       {payCard && (
         <TxForm
           initialKind="transfer"
-          fill={{ amount: payCard.amount, merchant: L.txForm.cardPayName, toAccountId: payCard.cardId }}
+          fill={{ amount: payCard.amount, merchant: L.txForm.cardPayName, toAccountId: payCard.cardId, source: `cardpay:${payCard.period}` }}
           onClose={() => setPayCard(null)}
         />
       )}
